@@ -1,0 +1,62 @@
+<!-- Positions Table Partial -->
+<div class="table-container">
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Symbol</th>
+                <th>Product</th>
+                <th>Qty</th>
+                <th>Avg. Price</th>
+                <th>LTP</th>
+                <th>P&L</th>
+                <th>Change</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for position in positions %}
+            <tr>
+                <td>
+                    <span class="table__symbol">{{ position.tradingsymbol }}</span>
+                    {% if position.exchange %}
+                    <br><small class="text-muted">{{ position.exchange }}</small>
+                    {% endif %}
+                </td>
+                <td>
+                    <span class="text-muted" style="text-transform: uppercase; font-size: 0.75rem;">{{position.product|default:"—" }}</span>
+                </td>
+                <td class="table__number {% if position.quantity < 0 %}table__negative{% endif %}">
+                    {{ position.quantity }}
+                </td>
+                <td class="table__number">₹{{ position.average_price|floatformat:2 }}</td>
+                <td class="table__number">₹{{ position.last_price|floatformat:2 }}</td>
+                <td
+                    class="table__number {% if position.pnl > 0 or position.unrealised > 0 %}table__positive{% elif position.pnl < 0 or position.unrealised < 0 %}table__negative{% endif %}">
+                    {% if position.pnl %}
+                    {% if position.pnl > 0 %}+{% endif %}₹{{ position.pnl|floatformat:2 }}
+                    {% elif position.unrealised %}
+                    {% if position.unrealised > 0 %}+{% endif %}₹{{ position.unrealised|floatformat:2 }}
+                    {% else %}
+                    —
+                    {% endif %}
+                </td>
+                <td>
+                    {% if position.day_change_percentage %}
+                    <span
+                        class="table__number {% if position.day_change_percentage > 0 %}table__positive{% elif position.day_change_percentage < 0 %}table__negative{% endif %}">
+                        {% if position.day_change_percentage > 0 %}+{% endif %}{{position.day_change_percentage|floatformat:2 }}%
+                    </span>
+                    {% else %}
+                    —
+                    {% endif %}
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="7" class="empty-state">
+                    No positions data available
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>

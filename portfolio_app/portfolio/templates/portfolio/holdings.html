@@ -1,0 +1,20 @@
+{% extends 'portfolio/base.html' %}
+
+{% block title %}Holdings - Portfolio{% endblock %}
+{% block header_title %}Holdings{% endblock %}
+{% block header_subtitle %}Your portfolio investments{% endblock %}
+
+{% block content %}
+<section class="section">
+    {% if holdings.data %}
+    {% include 'portfolio/_holdings_table.html' with holdings=holdings.data %}
+    {% elif holdings and holdings|length > 0 %}
+    {% include 'portfolio/_holdings_table.html' %}
+    {% else %}
+    <div class="empty-state">
+        <div class="empty-state__icon">📊</div>
+        <div class="empty-state__text">No holdings found in your portfolio</div>
+    </div>
+    {% endif %}
+</section>
+{% endblock %}

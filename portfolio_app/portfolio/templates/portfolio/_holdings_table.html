@@ -1,0 +1,65 @@
+<!-- Holdings Table Partial -->
+<div class="table-container">
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Symbol</th>
+                <th>Qty</th>
+                <th>Avg. Cost</th>
+                <th>LTP</th>
+                <th>Current Value</th>
+                <th>P&L</th>
+                <th>Change</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for holding in holdings %}
+            <tr>
+                <td>
+                    <span class="table__symbol">{{ holding.tradingsymbol }}</span>
+                    {% if holding.exchange %}
+                    <br><small class="text-muted">{{ holding.exchange }}</small>
+                    {% endif %}
+                </td>
+                <td class="table__number">{{ holding.quantity }}</td>
+                <td class="table__number">₹{{ holding.average_price|floatformat:2 }}</td>
+                <td class="table__number">₹{{ holding.last_price|floatformat:2 }}</td>
+                <td class="table__number">
+                    {% if holding.last_price and holding.quantity %}
+                    ₹{{ holding.last_price|floatformat:0 }}
+                    {% else %}
+                    —
+                    {% endif %}
+                </td>
+                <td
+                    class="table__number {% if holding.pnl > 0 or holding.profit > 0 %}table__positive{% elif holding.pnl < 0 or holding.profit < 0 %}table__negative{% endif %}">
+                    {% if holding.pnl %}
+                    {% if holding.pnl > 0 %}+{% endif %}₹{{ holding.pnl|floatformat:2 }}
+                    {% elif holding.profit %}
+                    {% if holding.profit > 0 %}+{% endif %}₹{{ holding.profit|floatformat:2 }}
+                    {% else %}
+                    —
+                    {% endif %}
+                </td>
+                <td>
+                    <span class="table__number {% if holding.day_change_percentage %}{% if holding.day_change_percentage > 0 %}table__positive{% elif holding.day_change_percentage < 0 %}table__negative{% endif %}{% elif holding.change %}{% if holding.change > 0 %}table__positive{% elif holding.change < 0 %}table__negative{% endif %}{% endif %}">
+                        {% if holding.day_change_percentage %}
+                        {% if holding.day_change_percentage > 0 %}+{% endif %}{{ holding.day_change_percentage|floatformat:2 }}%
+                        {% elif holding.change %}
+                        {% if holding.change > 0 %}+{% endif %}{{ holding.change|floatformat:2 }}%
+                        {% else %}
+                        —
+                        {% endif %}
+                    </span>
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="7" class="empty-state">
+                    No holdings available
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>

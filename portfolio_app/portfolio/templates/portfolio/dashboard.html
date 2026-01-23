@@ -1,0 +1,121 @@
+{% extends 'portfolio/base.html' %}
+
+{% block title %}Dashboard - Endurance{% endblock %}
+{% block header_title %}Endurance{% endblock %}
+{% block header_subtitle %}
+{% if profile.user_name %}Welcome back, {{ profile.user_name }}{% else %}Your trading overview{% endif %}
+{% endblock %}
+
+{% block content %}
+<!-- Profile Card -->
+{% if profile and not profile.error %}
+<div class="profile-card">
+    <div class="profile-card__avatar">
+        {% if profile.user_name %}
+        {{ profile.user_name|slice:":1"|upper }}
+        {% else %}
+        P
+        {% endif %}
+    </div>
+    <div class="profile-card__info">
+        <div class="profile-card__name">{{ profile.user_name|default:"Trader" }}</div>
+        <div class="profile-card__email">{{ profile.email|default:"" }}</div>
+        <div class="profile-card__meta">
+            {% if profile.user_id %}
+            <span class="profile-card__meta-item">ID: {{ profile.user_id }}</span>
+            {% endif %}
+            {% if profile.broker %}
+            <span class="profile-card__meta-item">{{ profile.broker }}</span>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Stats Overview -->
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-card__label">Total Holdings</div>
+        <div class="stat-card__value">
+            {% if holdings.data %}
+            {{ holdings.data|length }}
+            {% elif holdings|length > 0 and holdings.0 %}
+            {{ holdings|length }}
+            {% else %}
+            0
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="stat-card">
+        <div class="stat-card__label">Open Positions</div>
+        <div class="stat-card__value">
+            {% if positions.net %}
+            {{ positions.net|length }}
+            {% elif positions.day %}
+            {{ positions.day|length }}
+            {% else %}
+            0
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="stat-card">
+        <div class="stat-card__label">Available Margin</div>
+        <div class="stat-card__value">
+            {% if margins.equity.available.live_balance %}
+            ₹{{ margins.equity.available.live_balance|floatformat:0 }}
+            {% elif margins.equity.net %}
+            ₹{{ margins.equity.net|floatformat:0 }}
+            {% else %}
+            —
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="stat-card">
+        <div class="stat-card__label">Used Margin</div>
+        <div class="stat-card__value">
+            {% if margins.equity.utilised.debits %}
+            ₹{{ margins.equity.utilised.debits|floatformat:0 }}
+            {% else %}
+            —
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Holdings Section -->
+<section class="section">
+    <h2 class="section__title">Holdings</h2>
+
+    {% if holdings.data %}
+    {% with holding_list=holdings.data %}
+    {% include 'portfolio/_holdings_table.html' with holdings=holding_list %}
+    {% endwith %}
+    {% elif holdings and holdings|length > 0 %}
+    {% include 'portfolio/_holdings_table.html' %}
+    {% else %}
+    <div class="empty-state">
+        <div class="empty-state__icon">📊</div>
+        <div class="empty-state__text">No holdings found</div>
+    </div>
+    {% endif %}
+</section>
+
+<!-- Positions Section -->
+<section class="section">
+    <h2 class="section__title">Positions</h2>
+
+    {% if positions.net and positions.net|length > 0 %}
+    {% include 'portfolio/_positions_table.html' with positions=positions.net %}
+    {% elif positions.day and positions.day|length > 0 %}
+    {% include 'portfolio/_positions_table.html' with positions=positions.day %}
+    {% else %}
+    <div class="empty-state">
+        <div class="empty-state__icon">📈</div>
+        <div class="empty-state__text">No open positions</div>
+    </div>
+    {% endif %}
+</section>
+{% endblock %}
