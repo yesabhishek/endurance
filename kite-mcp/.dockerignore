@@ -1,0 +1,24 @@
+# Version control
+.git
+.gitignore
+
+# Binary output
+kite-mcp-server
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Environment
+.env
+.envrc
+
+# Nix files
+flake.lock
+flake.nix
+
+# Docker
+Dockerfile
+.dockerignore

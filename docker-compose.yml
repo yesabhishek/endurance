@@ -1,0 +1,51 @@
+# Endurance - Trading Portfolio Platform
+# Docker Compose configuration for running all services
+
+services:
+  # Kite MCP Server - Go-based MCP server for Kite Connect API
+  kite-mcp:
+    build:
+      context: ./kite-mcp
+      dockerfile: Dockerfile
+    container_name: endurance-kite-mcp
+    ports:
+      - "8080:8080"
+    environment:
+      - KITE_API_KEY=${KITE_API_KEY}
+      - KITE_API_SECRET=${KITE_API_SECRET}
+      - APP_MODE=http
+      - APP_PORT=8080
+      - APP_HOST=0.0.0.0
+      - LOG_LEVEL=info
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # Django Portfolio App - Web frontend for portfolio management
+  portfolio-app:
+    build:
+      context: ./portfolio_app
+      dockerfile: Dockerfile
+    container_name: endurance-portfolio
+    ports:
+      - "8000:8000"
+    environment:
+      - DEBUG=False
+      - DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY:-your-secret-key-change-in-production}
+      - KITE_API_KEY=${KITE_API_KEY}
+      - KITE_API_SECRET=${KITE_API_SECRET}
+      - KITE_MCP_URL=http://kite-mcp:8080/mcp
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+    depends_on:
+      kite-mcp:
+        condition: service_started
+    restart: unless-stopped
+    volumes:
+      - portfolio-data:/app/data
+
+volumes:
+  portfolio-data:

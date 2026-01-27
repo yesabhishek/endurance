@@ -1,0 +1,41 @@
+{% extends 'portfolio/base.html' %}
+
+{% block title %}Sector Watchlists - Endurance{% endblock %}
+{% block header_title %}Watchlists{% endblock %}
+{% block header_subtitle %}Track stocks by sector{% endblock %}
+
+{% block content %}
+<section class="section">
+    <div class="sector-grid">
+        {% for watchlist in watchlists %}
+        <a href="{% url 'portfolio:sector_watchlist' sector=watchlist.sector %}" class="sector-card">
+            <div class="sector-card__icon">
+                {% if watchlist.sector == 'healthcare' %}🏥
+                {% elif watchlist.sector == 'it' %}💻
+                {% elif watchlist.sector == 'infra' %}🏗️
+                {% elif watchlist.sector == 'automobile' %}🚗
+                {% elif watchlist.sector == 'banking' %}🏦
+                {% elif watchlist.sector == 'energy' %}⚡
+                {% elif watchlist.sector == 'fmcg' %}🛒
+                {% elif watchlist.sector == 'metals' %}⚙️
+                {% elif watchlist.sector == 'realty' %}🏠
+                {% else %}📊
+                {% endif %}
+            </div>
+            <div class="sector-card__content">
+                <div class="sector-card__name">{{ watchlist.name }}</div>
+                <div class="sector-card__count">{{ watchlist.items.count }} stocks</div>
+                {% if watchlist.description %}
+                <div class="sector-card__desc">{{ watchlist.description }}</div>
+                {% endif %}
+            </div>
+            <div class="sector-card__arrow">→</div>
+        </a>
+        {% empty %}
+        <div class="empty-state">
+            <div class="empty-state__text">No watchlists available</div>
+        </div>
+        {% endfor %}
+    </div>
+</section>
+{% endblock %}

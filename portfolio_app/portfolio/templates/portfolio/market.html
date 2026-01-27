@@ -1,0 +1,90 @@
+{% extends 'portfolio/base.html' %}
+
+{% block title %}Market Overview - Endurance{% endblock %}
+{% block header_title %}Market{% endblock %}
+{% block header_subtitle %}NSE & BSE Index Data{% endblock %}
+
+{% block content %}
+<!-- Portfolio Summary -->
+<section class="section">
+    <h2 class="section__title">Your Portfolio</h2>
+
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-card__label">Holdings</div>
+            <div class="stat-card__value">{{ holdings_count }}</div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-card__label">Portfolio Value</div>
+            <div class="stat-card__value">₹{{ total_value|floatformat:0 }}</div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-card__label">Total P&L</div>
+            <div class="stat-card__value {% if total_pnl >= 0 %}table__positive{% else %}table__negative{% endif %}">
+                {% if total_pnl >= 0 %}+{% endif %}₹{{ total_pnl|floatformat:0 }}
+            </div>
+            <div class="stat-card__change">
+                {% if total_pnl_pct >= 0 %}+{% endif %}{{ total_pnl_pct|floatformat:2 }}%
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Market Indices -->
+<section class="section">
+    <h2 class="section__title">Market Indices</h2>
+
+    {% if indices %}
+    <div class="index-grid">
+        {% for index in indices %}
+        <div class="index-card">
+            <div class="index-card__header">
+                <h3 class="index-card__name">{{ index.name }}</h3>
+                <span class="index-card__exchange">{{ index.exchange }}</span>
+            </div>
+
+            <div class="index-card__body">
+                {% if index.last_price %}
+                <div class="index-card__price">
+                    {{ index.last_price|floatformat:2 }}
+                </div>
+                <div
+                    class="index-card__change {% if index.change >= 0 %}table__positive{% else %}table__negative{% endif %}">
+                    {% if index.change >= 0 %}+{% endif %}{{ index.change|floatformat:2 }}
+                    <span class="index-card__pct">({% if index.change_pct >= 0 %}+{% endif %}{{
+                        index.change_pct|floatformat:2 }}%)</span>
+                </div>
+                {% else %}
+                <div class="index-card__price index-card__price--placeholder">
+                    —
+                </div>
+                <div class="index-card__change">
+                    <span class="text-muted">Login to view live data</span>
+                </div>
+                {% endif %}
+            </div>
+
+            {% if index.high and index.low %}
+            <div class="index-card__footer">
+                <span>H: {{ index.high|floatformat:2 }}</span>
+                <span>L: {{ index.low|floatformat:2 }}</span>
+            </div>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <p class="empty-state__text">Unable to fetch market data. Please login to view indices.</p>
+    </div>
+    {% endif %}
+</section>
+
+{% if error %}
+<div class="alert alert--warning" style="margin-top: var(--spacing-lg);">
+    <strong>Note:</strong> {{ error }}
+</div>
+{% endif %}
+{% endblock %}

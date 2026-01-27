@@ -435,3 +435,941 @@ a:hover {
 .text-muted {
     color: var(--text-muted);
 }
+
+/* ==========================================================================
+   NEW: Investment Detail Card
+   ========================================================================== */
+
+.investment-card {
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-sm);
+    padding: var(--spacing-md);
+    margin-bottom: var(--spacing-xl);
+}
+
+.investment-card__row {
+    display: flex;
+    justify-content: space-between;
+    padding: var(--spacing-xs) 0;
+}
+
+.investment-card__row+.investment-card__row {
+    border-top: 1px solid var(--border-subtle);
+}
+
+.investment-card__label {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+}
+
+.investment-card__value {
+    font-family: var(--font-mono);
+    font-weight: 500;
+}
+
+/* ==========================================================================
+   NEW: AI Suggestion Card
+   ========================================================================== */
+
+.ai-card {
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-sm);
+    padding: var(--spacing-lg);
+    text-align: center;
+}
+
+.ai-card__placeholder,
+.ai-card__loading {
+    color: var(--text-secondary);
+    font-style: italic;
+    margin-bottom: var(--spacing-md);
+}
+
+.ai-card__recommendation {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-md);
+    margin-bottom: var(--spacing-md);
+}
+
+.ai-card__recommendation-label {
+    font-size: 1.5rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.ai-card__recommendation--hold .ai-card__recommendation-label {
+    color: var(--text-primary);
+}
+
+.ai-card__recommendation--sell .ai-card__recommendation-label {
+    color: var(--text-primary);
+    text-decoration: underline;
+}
+
+.ai-card__recommendation--sleep .ai-card__recommendation-label {
+    color: var(--text-secondary);
+    font-style: italic;
+}
+
+.ai-card__confidence {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+}
+
+.ai-card__reasoning {
+    color: var(--text-secondary);
+    font-size: 0.95rem;
+    line-height: 1.6;
+    max-width: 500px;
+    margin: 0 auto var(--spacing-md);
+}
+
+.ai-card__error {
+    color: var(--text-primary);
+    background: var(--bg-secondary);
+    padding: var(--spacing-sm);
+    border-radius: var(--radius-sm);
+    font-size: 0.9rem;
+}
+
+/* ==========================================================================
+   NEW: Sector Grid & Cards
+   ========================================================================== */
+
+.sector-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: var(--spacing-md);
+}
+
+.sector-card {
+    display: block;
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-sm);
+    padding: var(--spacing-lg);
+    transition: background-color 0.2s, border-color 0.2s;
+    text-decoration: none;
+}
+
+.sector-card:hover {
+    background-color: var(--bg-secondary);
+    border-color: var(--text-secondary);
+}
+
+.sector-card__name {
+    font-weight: 600;
+    font-size: 1.1rem;
+    margin-bottom: var(--spacing-xs);
+}
+
+.sector-card__count {
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
+.sector-card__desc {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin-top: var(--spacing-sm);
+}
+
+/* ==========================================================================
+   NEW: Form Inputs
+   ========================================================================== */
+
+.add-stock-form {
+    display: flex;
+    gap: var(--spacing-sm);
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.input {
+    padding: var(--spacing-sm) var(--spacing-md);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-sm);
+    font-family: var(--font-sans);
+    font-size: 0.95rem;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    transition: border-color 0.2s;
+}
+
+.input:focus {
+    outline: none;
+    border-color: var(--text-primary);
+}
+
+.input::placeholder {
+    color: var(--text-muted);
+}
+
+.input--select {
+    min-width: 80px;
+    cursor: pointer;
+}
+
+/* ==========================================================================
+   NEW: Badges
+   ========================================================================== */
+
+.badge--owned {
+    background: var(--text-primary);
+    color: var(--bg-primary);
+}
+
+.badge--watching {
+    background: var(--bg-secondary);
+    color: var(--text-secondary);
+    border: 1px solid var(--border-light);
+}
+
+/* ==========================================================================
+   NEW: Icon Buttons
+   ========================================================================== */
+
+.btn-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 1.2rem;
+    line-height: 1;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-decoration: none;
+}
+
+.btn-icon:hover {
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    border-color: var(--text-secondary);
+}
+
+/* ==========================================================================
+   Footer
+   ========================================================================== */
+
+.footer {
+    margin-top: var(--spacing-2xl);
+    padding-top: var(--spacing-lg);
+    border-top: 1px solid var(--border-light);
+    text-align: center;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+}
+
+/* ==========================================================================
+   NEW: News List
+   ========================================================================== */
+
+.news-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+}
+
+.news-item {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--spacing-md);
+    padding: var(--spacing-md);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-md);
+    transition: all 0.2s;
+    text-decoration: none;
+    color: inherit;
+}
+
+.news-item:hover {
+    background: var(--bg-secondary);
+    border-color: var(--text-secondary);
+}
+
+.news-item__content {
+    flex: 1;
+}
+
+.news-item__title {
+    font-size: 1rem;
+    font-weight: 500;
+    line-height: 1.4;
+    margin-bottom: var(--spacing-xs);
+    color: var(--text-primary);
+}
+
+.news-item__meta {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    display: flex;
+    gap: var(--spacing-md);
+}
+
+.news-item__source {
+    font-weight: 500;
+    color: var(--text-secondary);
+}
+
+.news-item__summary {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    margin-top: var(--spacing-sm);
+    line-height: 1.5;
+}
+
+.news-item__arrow {
+    color: var(--text-muted);
+    font-size: 1.2rem;
+    flex-shrink: 0;
+}
+
+/* ==========================================================================
+   NEW: Index Cards Grid
+   ========================================================================== */
+
+.index-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: var(--spacing-md);
+}
+
+.index-card {
+    padding: var(--spacing-md);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-md);
+    background: var(--bg-primary);
+    transition: all 0.2s;
+}
+
+.index-card:hover {
+    border-color: var(--text-secondary);
+}
+
+.index-card__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: var(--spacing-sm);
+}
+
+.index-card__name {
+    font-size: 1rem;
+    font-weight: 600;
+    margin: 0;
+}
+
+.index-card__exchange {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    padding: 2px 6px;
+    background: var(--bg-secondary);
+    border-radius: var(--radius-sm);
+}
+
+.index-card__body {
+    margin-bottom: var(--spacing-sm);
+}
+
+.index-card__price {
+    font-size: 1.5rem;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+}
+
+.index-card__price--placeholder {
+    color: var(--text-muted);
+}
+
+.index-card__change {
+    font-size: 0.9rem;
+    margin-top: var(--spacing-xs);
+}
+
+.index-card__pct {
+    color: inherit;
+}
+
+.index-card__footer {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    padding-top: var(--spacing-sm);
+    border-top: 1px solid var(--border-subtle);
+}
+
+/* ==========================================================================
+   Alert Box
+   ========================================================================== */
+
+.alert {
+    padding: var(--spacing-md);
+    border-radius: var(--radius-md);
+    font-size: 0.9rem;
+}
+
+.alert--warning {
+    background: var(--bg-code);
+    border: 1px solid var(--border-light);
+    color: var(--text-secondary);
+}
+
+/* ==========================================================================
+   Stock Cell (Symbol + Name)
+   ========================================================================== */
+
+.stock-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.stock-cell__name {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    font-weight: 400;
+}
+
+/* ==========================================================================
+   Clickable Table Rows
+   ========================================================================== */
+
+.table__row--clickable {
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.table__row--clickable:hover {
+    background: var(--bg-secondary);
+}
+
+.btn-view {
+    display: inline-block;
+    padding: var(--spacing-xs) var(--spacing-sm);
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    text-decoration: none;
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-sm);
+    transition: all 0.2s;
+}
+
+.btn-view:hover {
+    background: var(--text-primary);
+    color: var(--bg-primary);
+    border-color: var(--text-primary);
+}
+
+/* ==========================================================================
+   P&L Cell Display
+   ========================================================================== */
+
+.pnl-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.pnl-cell__value {
+    font-weight: 500;
+}
+
+.pnl-cell__pct {
+    font-size: 0.8rem;
+    opacity: 0.8;
+}
+
+/* ==========================================================================
+   Watchlist Grid
+   ========================================================================== */
+
+.watchlist-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: var(--spacing-md);
+}
+
+.watchlist-card {
+    display: flex;
+    flex-direction: column;
+    padding: var(--spacing-md);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-md);
+    text-decoration: none;
+    color: inherit;
+    transition: all 0.2s;
+}
+
+.watchlist-card:hover {
+    border-color: var(--text-primary);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.watchlist-card__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--spacing-xs);
+}
+
+.watchlist-card__symbol {
+    font-weight: 600;
+    font-size: 1rem;
+}
+
+.watchlist-card__exchange {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    padding: 2px 4px;
+    background: var(--bg-secondary);
+    border-radius: var(--radius-sm);
+}
+
+.watchlist-card__name {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin-bottom: var(--spacing-sm);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.watchlist-card__price {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin-bottom: var(--spacing-xs);
+}
+
+.watchlist-card__change {
+    font-size: 0.9rem;
+    margin-bottom: var(--spacing-sm);
+}
+
+.watchlist-card__footer {
+    margin-top: auto;
+}
+
+/* ==========================================================================
+   Stock Detail Page
+   ========================================================================== */
+
+.stock-status {
+    margin-bottom: var(--spacing-lg);
+}
+
+.price-card {
+    display: flex;
+    align-items: baseline;
+    gap: var(--spacing-md);
+    padding: var(--spacing-lg);
+    background: var(--bg-secondary);
+    border-radius: var(--radius-md);
+    margin-bottom: var(--spacing-lg);
+}
+
+.price-card__main {
+    display: flex;
+    flex-direction: column;
+}
+
+.price-card__label {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin-bottom: var(--spacing-xs);
+}
+
+.price-card__value {
+    font-size: 2.5rem;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+}
+
+.price-card__change {
+    font-size: 1.25rem;
+    font-weight: 500;
+}
+
+/* ==========================================================================
+   OHLC Grid
+   ========================================================================== */
+
+.ohlc-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: var(--spacing-md);
+}
+
+.ohlc-item {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+}
+
+.ohlc-item__label {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+}
+
+.ohlc-item__value {
+    font-size: 1.1rem;
+    font-weight: 500;
+}
+
+/* ==========================================================================
+   Volume Display
+   ========================================================================== */
+
+.volume-display {
+    font-size: 1.5rem;
+    font-weight: 500;
+}
+
+@media (max-width: 600px) {
+    .ohlc-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .watchlist-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .price-card__value {
+        font-size: 2rem;
+    }
+}
+
+/* ==========================================================================
+   BLOOMBERG TERMINAL STYLE
+   ========================================================================== */
+
+/* Terminal Stats Bar */
+.terminal-bar {
+    display: flex;
+    gap: var(--spacing-lg);
+    padding: var(--spacing-md);
+    background: #1a1a1a;
+    border-radius: var(--radius-md);
+    margin-bottom: var(--spacing-lg);
+}
+
+.terminal-bar__item {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.terminal-bar__label {
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: #888;
+}
+
+.terminal-bar__value {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #fff;
+    font-family: var(--font-mono);
+}
+
+/* Terminal Input */
+.input--terminal {
+    background: #1a1a1a;
+    border-color: #333;
+    color: #fff;
+    font-family: var(--font-mono);
+}
+
+.input--terminal::placeholder {
+    color: #666;
+}
+
+.input--terminal:focus {
+    border-color: #00ff88;
+}
+
+.btn--terminal {
+    background: #00ff88;
+    color: #000;
+    font-weight: 600;
+    font-family: var(--font-mono);
+    border: none;
+}
+
+.btn--terminal:hover {
+    background: #00cc6a;
+}
+
+/* Terminal Grid */
+.terminal-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: var(--spacing-sm);
+}
+
+.terminal-card {
+    display: flex;
+    flex-direction: column;
+    padding: var(--spacing-md);
+    background: #0d0d0d;
+    border: 1px solid #222;
+    border-radius: var(--radius-sm);
+    text-decoration: none;
+    color: #fff;
+    font-family: var(--font-mono);
+    transition: all 0.15s;
+}
+
+.terminal-card:hover {
+    background: #1a1a1a;
+    border-color: #00ff88;
+    transform: translateY(-1px);
+}
+
+.terminal-card__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--spacing-xs);
+}
+
+.terminal-card__symbol {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: #fff;
+}
+
+.terminal-card__exchange {
+    font-size: 0.6rem;
+    color: #666;
+    padding: 1px 4px;
+    background: #222;
+    border-radius: 2px;
+}
+
+.terminal-card__price {
+    margin-bottom: var(--spacing-xs);
+}
+
+.terminal-card__ltp {
+    font-size: 1.4rem;
+    font-weight: 600;
+    color: #fff;
+}
+
+.terminal-card__ltp--no-data {
+    color: #444;
+}
+
+.terminal-card__change {
+    font-size: 0.85rem;
+    font-weight: 500;
+    margin-bottom: var(--spacing-sm);
+    color: #888;
+}
+
+.terminal-card__change--up {
+    color: #00ff88;
+}
+
+.terminal-card__change--down {
+    color: #ff4444;
+}
+
+.terminal-card__name {
+    font-size: 0.7rem;
+    color: #666;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-bottom: var(--spacing-xs);
+    font-family: var(--font-sans);
+}
+
+.terminal-card__ohlc {
+    display: flex;
+    gap: var(--spacing-sm);
+    font-size: 0.65rem;
+    color: #555;
+    margin-bottom: var(--spacing-xs);
+}
+
+.terminal-card__volume {
+    font-size: 0.65rem;
+    color: #444;
+    margin-bottom: var(--spacing-sm);
+}
+
+.terminal-card__footer {
+    display: flex;
+    gap: var(--spacing-xs);
+    margin-top: auto;
+}
+
+/* Terminal Badges */
+.terminal-badge {
+    display: inline-block;
+    padding: 2px 6px;
+    font-size: 0.55rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border-radius: 2px;
+}
+
+.terminal-badge--owned {
+    background: #00ff88;
+    color: #000;
+}
+
+.terminal-badge--watch {
+    background: #333;
+    color: #888;
+}
+
+.terminal-badge--qty {
+    background: #1a1a1a;
+    color: #666;
+    border: 1px solid #333;
+}
+
+@media (max-width: 600px) {
+    .terminal-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .terminal-bar {
+        flex-wrap: wrap;
+    }
+}
+
+/* ==========================================================================
+   Enhanced Sector Cards
+   ========================================================================== */
+
+.sector-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: var(--spacing-md);
+}
+
+.sector-card {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+    padding: var(--spacing-lg);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-md);
+    text-decoration: none;
+    color: inherit;
+    transition: all 0.2s;
+}
+
+.sector-card:hover {
+    border-color: var(--text-primary);
+    transform: translateX(4px);
+}
+
+.sector-card__icon {
+    font-size: 1.8rem;
+    flex-shrink: 0;
+}
+
+.sector-card__content {
+    flex: 1;
+}
+
+.sector-card__name {
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin-bottom: 2px;
+}
+
+.sector-card__count {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    font-family: var(--font-mono);
+}
+
+.sector-card__desc {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin-top: var(--spacing-xs);
+}
+
+.sector-card__arrow {
+    font-size: 1.2rem;
+    color: var(--text-muted);
+    transition: transform 0.2s;
+}
+
+.sector-card:hover .sector-card__arrow {
+    transform: translateX(4px);
+    color: var(--text-primary);
+}
+
+/* ==========================================================================
+   Chart Cards (Light Theme)
+   ========================================================================== */
+
+.chart-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: var(--spacing-md);
+}
+
+.chart-card {
+    background: var(--bg-primary);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+}
+
+.chart-card__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--spacing-sm) var(--spacing-md);
+    border-bottom: 1px solid var(--border-light);
+}
+
+.chart-card__title {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.chart-card__badge {
+    font-size: 0.65rem;
+    color: var(--text-muted);
+    padding: 2px 6px;
+    background: var(--bg-secondary);
+    border-radius: var(--radius-sm);
+}
+
+.chart-card__container {
+    height: 200px;
+    background: var(--bg-primary);
+}
+
+@media (max-width: 600px) {
+    .chart-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .chart-card__container {
+        height: 160px;
+    }
+}

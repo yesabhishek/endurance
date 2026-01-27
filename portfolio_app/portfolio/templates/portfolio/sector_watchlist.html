@@ -1,0 +1,98 @@
+{% extends 'portfolio/base.html' %}
+
+{% block title %}{{ watchlist.name }} - Endurance{% endblock %}
+{% block header_title %}{{ watchlist.name }}{% endblock %}
+{% block header_subtitle %}{{ watchlist.description|default:"Sector watchlist" }}{% endblock %}
+
+{% block content %}
+<!-- Sector Stats Bar -->
+<div class="terminal-bar">
+    <div class="terminal-bar__item">
+        <span class="terminal-bar__label">STOCKS</span>
+        <span class="terminal-bar__value">{{ total_stocks }}</span>
+    </div>
+    <div class="terminal-bar__item">
+        <span class="terminal-bar__label">LIVE DATA</span>
+        <span class="terminal-bar__value">{{ stocks_with_data }}/{{ total_stocks }}</span>
+    </div>
+    <div class="terminal-bar__item">
+        <span class="terminal-bar__label">SECTOR</span>
+        <span class="terminal-bar__value">{{ watchlist.sector|upper }}</span>
+    </div>
+</div>
+
+<!-- Add Stock Form -->
+<section class="section">
+    <form method="post" action="{% url 'portfolio:add_to_watchlist' sector=watchlist.sector %}" class="add-stock-form">
+        {% csrf_token %}
+        <input type="text" name="symbol" placeholder="Add symbol..." required class="input input--terminal">
+        <button type="submit" class="btn btn--terminal">+ ADD</button>
+    </form>
+</section>
+
+<!-- Terminal Grid -->
+<section class="section">
+    <div class="terminal-grid">
+        {% for item in items %}
+        <a href="{% url 'portfolio:stock_detail' symbol=item.symbol %}" class="terminal-card">
+            <div class="terminal-card__header">
+                <span class="terminal-card__symbol">{{ item.symbol }}</span>
+                <span class="terminal-card__exchange">{{ item.exchange }}</span>
+            </div>
+
+            <div class="terminal-card__price">
+                {% if item.last_price %}
+                <span class="terminal-card__ltp">₹{{ item.last_price|floatformat:2 }}</span>
+                {% else %}
+                <span class="terminal-card__ltp terminal-card__ltp--no-data">--</span>
+                {% endif %}
+            </div>
+
+            <div
+                class="terminal-card__change {% if item.day_change > 0 %}terminal-card__change--up{% elif item.day_change < 0 %}terminal-card__change--down{% endif %}">
+                {% if item.day_change %}
+                {% if item.day_change > 0 %}▲{% elif item.day_change < 0 %}▼{% endif %} {{ item.day_change|floatformat:2
+                    }}% {% else %} — {% endif %} </div>
+
+                    {% if item.notes %}
+                    <div class="terminal-card__name">{{ item.notes }}</div>
+                    {% endif %}
+
+                    {% if item.open or item.high or item.low %}
+                    <div class="terminal-card__ohlc">
+                        <span title="Open">O:{{ item.open|floatformat:0 }}</span>
+                        <span title="High">H:{{ item.high|floatformat:0 }}</span>
+                        <span title="Low">L:{{ item.low|floatformat:0 }}</span>
+                    </div>
+                    {% endif %}
+
+                    {% if item.volume %}
+                    <div class="terminal-card__volume">
+                        VOL: {{ item.volume|floatformat:0 }}
+                    </div>
+                    {% endif %}
+
+                    <div class="terminal-card__footer">
+                        {% if item.in_portfolio %}
+                        <span class="terminal-badge terminal-badge--owned">OWNED</span>
+                        {% if item.quantity %}
+                        <span class="terminal-badge terminal-badge--qty">{{ item.quantity }} shares</span>
+                        {% endif %}
+                        {% else %}
+                        <span class="terminal-badge terminal-badge--watch">WATCH</span>
+                        {% endif %}
+                    </div>
+        </a>
+        {% empty %}
+        <div class="empty-state">
+            <p class="empty-state__text">No stocks in this sector.</p>
+        </div>
+        {% endfor %}
+    </div>
+</section>
+
+<!-- Back Link -->
+<div style="margin-top: var(--spacing-lg);">
+    <a href="{% url 'portfolio:watchlist' %}" class="btn btn-outline">← All Sectors</a>
+</div>
+{% endblock %}

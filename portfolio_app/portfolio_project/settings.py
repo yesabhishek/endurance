@@ -6,16 +6,20 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 
-# Load environment variables from parent directory
+# Load environment variables from .env file (local development)
+load_dotenv(Path(__file__).resolve().parent.parent / '.env')
+# Also try parent directory (for docker-compose setup)
 load_dotenv(Path(__file__).resolve().parent.parent.parent / '.env')
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = 'django-insecure-portfolio-app-dev-key-change-in-production'
+# Security settings - use environment variables in production
+SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'django-insecure-portfolio-app-dev-key-change-in-production')
 
-DEBUG = True
+DEBUG = os.getenv('DEBUG', 'True').lower() in ('true', '1', 'yes')
 
-ALLOWED_HOSTS = ['localhost', '127.0.0.1']
+# Allow Docker networking and common hosts
+ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1,0.0.0.0').split(',')
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -29,6 +33,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',  # Serve static files in production
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -57,10 +62,11 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'portfolio_project.wsgi.application'
 
+# Database - use persistent volume in Docker
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'NAME': os.getenv('DB_PATH', BASE_DIR / 'db.sqlite3'),
     }
 }
 
@@ -70,6 +76,10 @@ USE_I18N = True
 USE_TZ = True
 
 STATIC_URL = 'static/'
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+
+# WhiteNoise for serving static files in production
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
@@ -80,7 +90,12 @@ KITE_MCP_URL = os.getenv('KITE_MCP_URL', 'http://localhost:8080/mcp')
 KITE_API_KEY = os.getenv('KITE_API_KEY', '')
 KITE_API_SECRET = os.getenv('KITE_API_SECRET', '')
 
+# OpenAI API key for AI suggestions
+OPENAI_API_KEY = os.getenv('OPENAI_API_KEY', '')
+
 # Session configuration for storing access token
 SESSION_ENGINE = 'django.contrib.sessions.backends.signed_cookies'
 SESSION_COOKIE_HTTPONLY = True
 
+# CSRF trusted origins for Docker
+CSRF_TRUSTED_ORIGINS = os.getenv('CSRF_TRUSTED_ORIGINS', 'http://localhost:8000,http://127.0.0.1:8000').split(',')

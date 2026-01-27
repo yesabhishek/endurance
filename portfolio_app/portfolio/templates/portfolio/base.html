@@ -25,13 +25,21 @@
                 class="nav__link {% if request.resolver_match.url_name == 'dashboard' %}nav__link--active{% endif %}">
                 Dashboard
             </a>
+            <a href="{% url 'portfolio:market' %}"
+                class="nav__link {% if request.resolver_match.url_name == 'market' %}nav__link--active{% endif %}">
+                Market
+            </a>
             <a href="{% url 'portfolio:holdings' %}"
-                class="nav__link {% if request.resolver_match.url_name == 'holdings' %}nav__link--active{% endif %}">
+                class="nav__link {% if request.resolver_match.url_name == 'holdings' or request.resolver_match.url_name == 'investment_detail' %}nav__link--active{% endif %}">
                 Holdings
             </a>
             <a href="{% url 'portfolio:positions' %}"
                 class="nav__link {% if request.resolver_match.url_name == 'positions' %}nav__link--active{% endif %}">
                 Positions
+            </a>
+            <a href="{% url 'portfolio:watchlist' %}"
+                class="nav__link {% if 'watchlist' in request.resolver_match.url_name %}nav__link--active{% endif %}">
+                Watchlist
             </a>
 
             {% if request.session.kite_access_token %}
@@ -59,7 +67,7 @@
         </main>
 
         <footer class="footer">
-            Powered by Kite MCP Server
+            Powered by Kite Connect
         </footer>
     </div>
 
