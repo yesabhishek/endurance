@@ -1,0 +1,299 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum AccountProvider {
+  GMAIL
+  KITE
+}
+
+enum SyncSource {
+  GMAIL
+  KITE
+}
+
+enum SyncStatus {
+  QUEUED
+  RUNNING
+  SUCCESS
+  FAILED
+}
+
+enum NotificationStatus {
+  UNREAD
+  READ
+}
+
+enum EmailKind {
+  CREDIT_CARD_BILL
+  UPI_PAYMENT
+  SUBSCRIPTION
+  BROKER_STATEMENT
+  GOLD
+  BILL
+  UNKNOWN
+}
+
+enum TransactionDirection {
+  DEBIT
+  CREDIT
+}
+
+enum RecurringStatus {
+  ACTIVE
+  PAUSED
+  UNKNOWN
+}
+
+enum AssetClass {
+  STOCK
+  MUTUAL_FUND
+  GOLD
+  ETF
+  CASH
+  OTHER
+}
+
+model ConnectedAccount {
+  id           String          @id @default(cuid())
+  provider     AccountProvider
+  accountEmail String?
+  displayName  String?
+  status       String          @default("connected")
+  scope        String?
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  tokens       OAuthToken[]
+  syncRuns     SyncRun[]
+  syncCursors  SyncCursor[]
+
+  @@unique([provider, accountEmail])
+  @@index([provider])
+}
+
+model SyncCursor {
+  id                 String           @id @default(cuid())
+  source             SyncSource
+  connectedAccountId String
+  cursorType         String
+  lastMessageAt      DateTime?
+  lastMessageId      String?
+  lastHistoryId      String?
+  metadataJson       String?
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+  connectedAccount   ConnectedAccount @relation(fields: [connectedAccountId], references: [id], onDelete: Cascade)
+
+  @@unique([source, connectedAccountId])
+  @@index([source, updatedAt])
+  @@index([connectedAccountId])
+}
+
+model OAuthToken {
+  id                    String           @id @default(cuid())
+  connectedAccountId    String
+  accessTokenEncrypted  String?
+  refreshTokenEncrypted String?
+  expiryDate            DateTime?
+  scope                 String?
+  createdAt             DateTime         @default(now())
+  updatedAt             DateTime         @updatedAt
+  connectedAccount      ConnectedAccount @relation(fields: [connectedAccountId], references: [id], onDelete: Cascade)
+
+  @@index([connectedAccountId])
+}
+
+model SyncRun {
+  id                 String            @id @default(cuid())
+  source             SyncSource
+  status             SyncStatus
+  connectedAccountId String?
+  startedAt          DateTime          @default(now())
+  finishedAt         DateTime?
+  scanned            Int               @default(0)
+  inserted           Int               @default(0)
+  updated            Int               @default(0)
+  error              String?
+  connectedAccount   ConnectedAccount? @relation(fields: [connectedAccountId], references: [id], onDelete: SetNull)
+  notifications      Notification[]
+
+  @@index([source, startedAt])
+}
+
+model Notification {
+  id        String             @id @default(cuid())
+  title     String
+  body      String
+  source    SyncSource
+  syncRunId String?
+  status    NotificationStatus @default(UNREAD)
+  createdAt DateTime           @default(now())
+  readAt    DateTime?
+  syncRun   SyncRun?           @relation(fields: [syncRunId], references: [id], onDelete: SetNull)
+
+  @@index([status, createdAt])
+  @@index([source, createdAt])
+  @@index([syncRunId])
+}
+
+model EmailSource {
+  id             String                 @id @default(cuid())
+  gmailMessageId String                 @unique
+  gmailThreadId  String?
+  accountEmail   String?
+  sentAt         DateTime
+  fromAddress    String?
+  fromName       String?
+  subject        String
+  snippet        String?
+  labelsJson     String?
+  createdAt      DateTime               @default(now())
+  parsed         ParsedFinancialEmail[]
+  transactions   Transaction[]
+
+  @@index([sentAt])
+  @@index([accountEmail])
+}
+
+model ParsedFinancialEmail {
+  id                String      @id @default(cuid())
+  emailSourceId     String
+  kind              EmailKind
+  amount            Decimal?
+  currency          String      @default("INR")
+  merchantName      String?
+  paymentInstrument String?
+  category          String?
+  confidence        Float       @default(0)
+  metadataJson      String?
+  createdAt         DateTime    @default(now())
+  emailSource       EmailSource @relation(fields: [emailSourceId], references: [id], onDelete: Cascade)
+
+  @@index([kind])
+}
+
+model Merchant {
+  id             String             @id @default(cuid())
+  name           String             @unique
+  normalizedName String
+  category       String?
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+  transactions   Transaction[]
+  recurring      RecurringPayment[]
+}
+
+model Transaction {
+  id                String               @id @default(cuid())
+  emailSourceId     String?
+  merchantId        String?
+  externalId        String?              @unique
+  amount            Decimal
+  currency          String               @default("INR")
+  transactionDate   DateTime
+  direction         TransactionDirection @default(DEBIT)
+  category          String?
+  paymentInstrument String?
+  description       String?
+  confidence        Float                @default(0)
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+  emailSource       EmailSource?         @relation(fields: [emailSourceId], references: [id], onDelete: SetNull)
+  merchant          Merchant?            @relation(fields: [merchantId], references: [id], onDelete: SetNull)
+
+  @@index([transactionDate])
+  @@index([merchantId])
+}
+
+model RecurringPayment {
+  id          String          @id @default(cuid())
+  merchantId  String
+  amount      Decimal?
+  currency    String          @default("INR")
+  cadence     String          @default("monthly")
+  nextDueDate DateTime?
+  lastSeenAt  DateTime
+  source      String          @default("gmail")
+  status      RecurringStatus @default(UNKNOWN)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  merchant    Merchant        @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+
+  @@unique([merchantId, cadence])
+}
+
+model InvestmentAccount {
+  id          String    @id @default(cuid())
+  provider    String
+  accountName String?
+  accountRef  String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  holdings    Holding[]
+
+  @@unique([provider, accountRef])
+}
+
+model Holding {
+  id           String               @id @default(cuid())
+  accountId    String
+  source       String
+  assetClass   AssetClass
+  symbol       String?
+  isin         String?
+  name         String
+  exchange     String?
+  quantity     Decimal              @default(0)
+  averagePrice Decimal?
+  lastPrice    Decimal?
+  currentValue Decimal?
+  pnl          Decimal?
+  pnlPct       Decimal?
+  asOf         DateTime             @default(now())
+  metadataJson String?
+  account      InvestmentAccount    @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  snapshots    InvestmentSnapshot[]
+
+  @@unique([accountId, source, assetClass, name, symbol])
+  @@index([assetClass])
+}
+
+model InvestmentSnapshot {
+  id           String   @id @default(cuid())
+  holdingId    String
+  source       String
+  capturedAt   DateTime @default(now())
+  quantity     Decimal  @default(0)
+  price        Decimal?
+  value        Decimal?
+  pnl          Decimal?
+  metadataJson String?
+  holding      Holding  @relation(fields: [holdingId], references: [id], onDelete: Cascade)
+
+  @@index([capturedAt])
+}
+
+model ChatThread {
+  id        String        @id @default(cuid())
+  title     String        @default("Finance chat")
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+  messages  ChatMessage[]
+}
+
+model ChatMessage {
+  id           String     @id @default(cuid())
+  threadId     String
+  role         String
+  content      String
+  metadataJson String?
+  createdAt    DateTime   @default(now())
+  thread       ChatThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+
+  @@index([threadId, createdAt])
+}

@@ -1,8 +1,13 @@
 package kc
 
 import (
+	"crypto/sha256"
+	"fmt"
 	"io"
 	"log/slog"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/zerodha/kite-mcp-server/kc/instruments"
@@ -280,6 +285,117 @@ func TestCompleteSession(t *testing.T) {
 	err = manager.CompleteSession(sessionID, "invalid_token")
 	if err == nil {
 		t.Error("Expected error for invalid request token")
+	}
+}
+
+func TestCompleteSessionParsesAuthFieldsOnly(t *testing.T) {
+	manager, err := newTestManager("test_key", "test_secret")
+	if err != nil {
+		t.Fatalf("Expected no error creating manager, got: %v", err)
+	}
+
+	sessionID := manager.GenerateSession()
+	kiteData, err := manager.GetSession(sessionID)
+	if err != nil {
+		t.Fatalf("Expected test session data, got: %v", err)
+	}
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/session/token":
+			if r.Method != http.MethodPost {
+				t.Errorf("Expected POST /session/token, got %s", r.Method)
+			}
+			if err := r.ParseForm(); err != nil {
+				t.Errorf("Failed to parse form: %v", err)
+			}
+
+			expectedChecksum := sha256.Sum256([]byte("test_key" + "valid_request_token" + "test_secret"))
+			if got := r.Form.Get("checksum"); got != fmt.Sprintf("%x", expectedChecksum) {
+				t.Errorf("Unexpected checksum %q", got)
+			}
+
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{
+				"status": "success",
+				"data": {
+					"access_token": "access123",
+					"user_id": "USER123",
+					"user_name": "Test User",
+					"user_type": "individual",
+					"login_time": "30 Apr 2026 12:19:08"
+				}
+			}`))
+		case "/user/profile":
+			if got := r.Header.Get("Authorization"); got != "token test_key:access123" {
+				t.Errorf("Expected Authorization header with exchanged token, got %q", got)
+			}
+
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{
+				"status": "success",
+				"data": {
+					"user_id": "USER123",
+					"user_name": "Test User",
+					"user_shortname": "Test",
+					"user_type": "individual",
+					"email": "test@example.com",
+					"broker": "ZERODHA"
+				}
+			}`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	previousBaseURI := kiteAPIBaseURI
+	kiteAPIBaseURI = server.URL
+	t.Cleanup(func() {
+		kiteAPIBaseURI = previousBaseURI
+	})
+	kiteData.Kite.Client.SetBaseURI(server.URL)
+
+	err = manager.CompleteSession(sessionID, "valid_request_token")
+	if err != nil {
+		t.Fatalf("Expected session completion to succeed, got: %v", err)
+	}
+
+	profile, err := kiteData.Kite.Client.GetUserProfile()
+	if err != nil {
+		t.Fatalf("Expected profile request with stored access token to succeed, got: %v", err)
+	}
+	if profile.UserID != "USER123" {
+		t.Errorf("Expected profile user USER123, got %q", profile.UserID)
+	}
+}
+
+func TestCompleteSessionReturnsKiteErrorMessage(t *testing.T) {
+	manager, err := newTestManager("test_key", "test_secret")
+	if err != nil {
+		t.Fatalf("Expected no error creating manager, got: %v", err)
+	}
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusForbidden)
+		_, _ = w.Write([]byte(`{"status":"error","message":"Token is invalid or has expired.","error_type":"TokenException","data":null}`))
+	}))
+	defer server.Close()
+
+	previousBaseURI := kiteAPIBaseURI
+	kiteAPIBaseURI = server.URL
+	t.Cleanup(func() {
+		kiteAPIBaseURI = previousBaseURI
+	})
+
+	sessionID := manager.GenerateSession()
+	err = manager.CompleteSession(sessionID, "invalid_token")
+	if err == nil {
+		t.Fatal("Expected Kite token error")
+	}
+	if !strings.Contains(err.Error(), "Token is invalid or has expired.") {
+		t.Errorf("Expected Kite error message, got: %v", err)
 	}
 }
 

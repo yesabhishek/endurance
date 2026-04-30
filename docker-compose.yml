@@ -1,8 +1,18 @@
-# Endurance - Trading Portfolio Platform
-# Docker Compose configuration for running all services
+# Endurance - private local finance workspace
 
 services:
-  # Kite MCP Server - Go-based MCP server for Kite Connect API
+  redis:
+    image: redis:7-alpine
+    container_name: endurance-redis
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   kite-mcp:
     build:
       context: ./kite-mcp
@@ -25,27 +35,61 @@ services:
       retries: 3
       start_period: 10s
 
-  # Django Portfolio App - Web frontend for portfolio management
-  portfolio-app:
+  web:
     build:
-      context: ./portfolio_app
+      context: ./web
       dockerfile: Dockerfile
-    container_name: endurance-portfolio
+    container_name: endurance-web
     ports:
-      - "8000:8000"
+      - "3000:3000"
     environment:
-      - DEBUG=False
-      - DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY:-your-secret-key-change-in-production}
-      - KITE_API_KEY=${KITE_API_KEY}
-      - KITE_API_SECRET=${KITE_API_SECRET}
+      - NODE_ENV=production
+      - DATABASE_URL=file:/app/data/endurance.db
+      - APP_ENCRYPTION_KEY=${APP_ENCRYPTION_KEY}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
+      - GOOGLE_REDIRECT_URI=${GOOGLE_REDIRECT_URI:-http://localhost:3000/api/gmail/callback}
+      - GMAIL_SYNC_MONTHS=${GMAIL_SYNC_MONTHS:-48}
+      - GMAIL_SYNC_LIMIT=${GMAIL_SYNC_LIMIT:-500}
       - KITE_MCP_URL=http://kite-mcp:8080/mcp
-      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - REDIS_URL=redis://redis:6379
+      - AI_MODEL=${AI_MODEL:-openai/gpt-5.4}
+      - AI_GATEWAY_API_KEY=${AI_GATEWAY_API_KEY:-}
     depends_on:
+      redis:
+        condition: service_healthy
       kite-mcp:
         condition: service_started
     restart: unless-stopped
     volumes:
-      - portfolio-data:/app/data
+      - web-data:/app/data
+
+  worker:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+      target: worker
+    container_name: endurance-worker
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=file:/app/data/endurance.db
+      - APP_ENCRYPTION_KEY=${APP_ENCRYPTION_KEY}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
+      - GOOGLE_REDIRECT_URI=${GOOGLE_REDIRECT_URI:-http://localhost:3000/api/gmail/callback}
+      - GMAIL_SYNC_MONTHS=${GMAIL_SYNC_MONTHS:-48}
+      - GMAIL_SYNC_LIMIT=${GMAIL_SYNC_LIMIT:-500}
+      - KITE_MCP_URL=http://kite-mcp:8080/mcp
+      - REDIS_URL=redis://redis:6379
+      - SYNC_WORKER_CONCURRENCY=1
+    depends_on:
+      redis:
+        condition: service_healthy
+      kite-mcp:
+        condition: service_started
+    restart: unless-stopped
+    volumes:
+      - web-data:/app/data
 
 volumes:
-  portfolio-data:
+  web-data:

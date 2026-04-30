@@ -3,6 +3,8 @@ package app
 import (
 	"io"
 	"log/slog"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"testing"
 )
@@ -152,5 +154,43 @@ func TestSetVersion(t *testing.T) {
 
 	if app.Version != testVersion {
 		t.Errorf("Expected version '%s', got '%s'", testVersion, app.Version)
+	}
+}
+
+func TestServeHealthCheck(t *testing.T) {
+	app := NewApp(testLogger())
+	mux := http.NewServeMux()
+	app.serveHealthCheck(mux)
+
+	req := httptest.NewRequest(http.MethodGet, "/health", nil)
+	rec := httptest.NewRecorder()
+
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("Expected status %d, got %d", http.StatusOK, rec.Code)
+	}
+
+	if got := rec.Body.String(); got != `{"status":"ok"}` {
+		t.Errorf("Expected health body, got %q", got)
+	}
+}
+
+func TestServeHealthCheckRejectsUnsupportedMethods(t *testing.T) {
+	app := NewApp(testLogger())
+	mux := http.NewServeMux()
+	app.serveHealthCheck(mux)
+
+	req := httptest.NewRequest(http.MethodPost, "/health", nil)
+	rec := httptest.NewRecorder()
+
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("Expected status %d, got %d", http.StatusMethodNotAllowed, rec.Code)
+	}
+
+	if got := rec.Header().Get("Allow"); got != "GET, HEAD" {
+		t.Errorf("Expected Allow header %q, got %q", "GET, HEAD", got)
 	}
 }

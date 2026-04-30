@@ -1,30 +1,30 @@
 # Endurance
 
-> A minimalist personal investment portfolio tracker powered by Kite Connect
+> A minimalist private finance workspace for expenses, investments, and read-only financial analysis.
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
-![Python](https://img.shields.io/badge/python-3.11+-green.svg)
-![Django](https://img.shields.io/badge/django-6.0-green.svg)
+![Next.js](https://img.shields.io/badge/next.js-16-black.svg)
+![Prisma](https://img.shields.io/badge/prisma-sqlite-black.svg)
 ![Docker](https://img.shields.io/badge/docker-ready-blue.svg)
 
-Endurance is a clean, Notion-inspired portfolio dashboard that connects to your Zerodha Kite account to display real-time holdings, positions, and market data. Built with Django and styled with a minimalist black & white aesthetic.
+Endurance is a local-first personal finance app. It ingests financial emails from Gmail, syncs investments through the Zerodha Kite MCP server, and exposes a read-only finance chat interface for technical expense, portfolio, and risk questions.
 
 ## Features
 
-- **Portfolio Dashboard** — View all your holdings and positions at a glance
-- **Candlestick Charts** — NIFTY 50 and SENSEX charts with Lightweight Charts
-- **Stock Details** — Detailed view for any stock with OHLC data and news
-- **Stock News** — Latest news for your holdings via Finnhub API
-- **AI Suggestions** — Investment insights powered by OpenAI (optional)
-- **Sector Watchlists** — Curated stock lists for Healthcare, IT, Banking, and more
-- **Minimalist UI** — Clean, Notion-inspired black & white design
+- **Expense Tracking** — Gmail OAuth read-only sync for card bills, Google Pay/UPI, subscriptions, bills, broker statements, MFs, and gold emails.
+- **Investment Sync** — Read-only Kite MCP integration for holdings, positions, margins, profile, quotes, and mutual fund holdings.
+- **Finance Chat** — `@expenses`, `@investments`, `@emails`, `@portfolio`, and `@market` questions using Vercel AI SDK with a strict read-only tool allowlist.
+- **Minimalist UX** — Dense, monochrome shadcn/ui interface with tables, small type, tabular numbers, and no marketing chrome.
+- **Local SQLite** — Prisma Client models for normalized financial records and encrypted OAuth tokens.
 
 ## Quick Start
 
 ### Prerequisites
 
-- Docker and Docker Compose
-- Zerodha Kite Connect API credentials ([Register here](https://developers.kite.trade/signup))
+- Node.js 22+ for local web development
+- Docker and Docker Compose for full stack local runtime
+- Zerodha Kite Connect credentials for the local Kite MCP server
+- Google OAuth credentials for Gmail ingestion
 
 ### Setup
 
@@ -43,33 +43,30 @@ Endurance is a clean, Notion-inspired portfolio dashboard that connects to your 
    ```env
    KITE_API_KEY=your_kite_api_key
    KITE_API_SECRET=your_kite_api_secret
+   APP_ENCRYPTION_KEY=replace-with-a-long-random-local-secret
+   GOOGLE_CLIENT_ID=your_google_oauth_client_id
+   GOOGLE_CLIENT_SECRET=your_google_oauth_client_secret
    ```
 
 3. **Start the application**
    ```bash
-   cd portfolio_app
    docker compose up --build
    ```
 
 4. **Open in browser**
    
-   Visit [http://localhost:8000](http://localhost:8000) and login with your Kite account.
+   Visit [http://localhost:3000](http://localhost:3000).
 
 ## Project Structure
 
 ```
 endurance/
-├── portfolio_app/          # Django application
-│   ├── portfolio/          # Main Django app
-│   │   ├── templates/      # HTML templates
-│   │   ├── static/         # CSS and JS
-│   │   ├── views.py        # View controllers
-│   │   ├── kite_auth.py    # Kite OAuth handling
-│   │   ├── news_service.py # Stock news fetching
-│   │   ├── chart_service.py # Chart data service
-│   │   └── curated_stocks.py # Sector stock lists
-│   ├── docker-compose.yml  # Docker configuration
-│   └── Dockerfile          # Container build
+├── web/                    # Next.js App Router app and worker
+│   ├── src/app/            # Routes and API handlers
+│   ├── src/components/     # shadcn/ui and app components
+│   ├── src/lib/            # Gmail, Kite, finance, DB libraries
+│   ├── prisma/             # Prisma schema
+│   └── scripts/init-db.mjs # SQLite initializer
 ├── kite-mcp/               # Kite MCP Server (Go)
 ├── .env.example            # Environment template
 └── README.md
@@ -81,28 +78,29 @@ endurance/
 
 | Variable | Description |
 |----------|-------------|
-| `KITE_API_KEY` | Your Kite Connect API key |
-| `KITE_API_SECRET` | Your Kite Connect API secret |
+| `KITE_API_KEY` | Kite Connect API key for the MCP server |
+| `KITE_API_SECRET` | Kite Connect API secret for the MCP server |
+| `APP_ENCRYPTION_KEY` | Local encryption key for OAuth tokens |
 
 ### Optional Environment Variables
 
 | Variable | Description |
 |----------|-------------|
-| `DJANGO_SECRET_KEY` | Django secret key (auto-generated if not set) |
-| `OPENAI_API_KEY` | OpenAI API key for AI suggestions |
-| `FINNHUB_API_KEY` | Finnhub API key for stock news |
+| `GOOGLE_CLIENT_ID` | Google OAuth client ID |
+| `GOOGLE_CLIENT_SECRET` | Google OAuth client secret |
+| `GOOGLE_REDIRECT_URI` | Usually `http://localhost:3000/api/gmail/callback` |
+| `AI_GATEWAY_API_KEY` | Optional Vercel AI Gateway key |
+| `AI_MODEL` | Optional AI model, defaults to `openai/gpt-5.4` |
 
 ## Pages
 
 | Route | Description |
 |-------|-------------|
-| `/` | Dashboard with portfolio overview and charts |
-| `/holdings/` | List of all holdings |
-| `/holdings/<symbol>/` | Detailed view of a holding |
-| `/positions/` | Open positions |
-| `/market/` | Market overview with index data |
-| `/watchlist/` | Sector-based watchlists |
-| `/stock/<symbol>/` | Stock details (any stock) |
+| `/` | Financial overview |
+| `/expenses` | Transactions, merchants, subscriptions, email evidence |
+| `/investments` | Holdings, snapshots, investment accounts |
+| `/chat` | Read-only finance chat |
+| `/settings` | Gmail/Kite sync and local data controls |
 
 ## Security
 
@@ -110,59 +108,47 @@ This project takes security seriously:
 
 - **No hardcoded credentials** — All secrets are loaded from environment variables
 - **`.env` is gitignored** — Your credentials are never committed
-- **OAuth flow** — Secure Kite authentication with token management
-- **Session-based auth** — Access tokens stored securely in Django sessions
+- **Encrypted OAuth tokens** — Gmail tokens are encrypted locally with `APP_ENCRYPTION_KEY`
+- **Normalized email storage** — The app stores source IDs, headers, snippets, parsed amounts, and metadata; it does not persist raw email bodies
+- **Read-only finance tools** — Chat can query local records and read-only Kite MCP tools only
 
 ### Important Security Notes
 
 1. **Never commit `.env`** — The `.gitignore` file excludes it
 2. **Rotate your API keys** if you accidentally expose them
-3. **Use strong `DJANGO_SECRET_KEY`** in production
+3. **Use a long random `APP_ENCRYPTION_KEY`** before connecting Gmail
 
 ## Development
 
-### Running locally without Docker
+### Running web locally without Docker
 
 ```bash
-cd portfolio_app
-python -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-python manage.py migrate
-python manage.py runserver
+cd web
+cp .env.example .env
+npm install
+npm run db:generate
+npm run db:init
+npm run dev
 ```
 
 ### Running tests
 
 ```bash
-python manage.py test
+cd web
+npm test
+npm run lint
+npm run build
 ```
 
 ## API Endpoints
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/api/portfolio/` | GET | Portfolio summary JSON |
-| `/api/chart/<symbol>/` | GET | OHLC chart data |
-| `/api/ai-suggest/<symbol>/` | GET | AI investment suggestion |
-
-## Customization
-
-### Changing the theme
-
-Edit `portfolio/static/portfolio/css/style.css`. The design uses CSS variables:
-
-```css
-:root {
-    --text-primary: #1a1a1a;
-    --bg-primary: #ffffff;
-    --border-light: #e5e5e5;
-}
-```
-
-### Adding new sectors
-
-Edit `portfolio/curated_stocks.py` to add new sector watchlists.
+| `/api/gmail/connect` | GET | Start Gmail OAuth |
+| `/api/gmail/callback` | GET | Complete Gmail OAuth |
+| `/api/sync/gmail` | POST | Run Gmail financial email sync |
+| `/api/sync/kite` | POST | Run Kite MCP holdings/MF sync |
+| `/api/chat` | POST | Stream read-only finance analysis |
 
 ## License
 
@@ -170,11 +156,11 @@ MIT License — see [LICENSE](LICENSE) for details.
 
 ## Acknowledgments
 
-- [Zerodha Kite Connect](https://kite.trade/) — Trading API
-- [Lightweight Charts](https://www.tradingview.com/lightweight-charts/) — Candlestick charts by TradingView
-- [Finnhub](https://finnhub.io/) — Stock news API
-- [OpenAI](https://openai.com/) — AI suggestions
+- [Zerodha Kite Connect](https://kite.trade/) and Kite MCP
+- [Google Gmail API](https://developers.google.com/gmail/api)
+- [Vercel AI SDK](https://ai-sdk.dev/docs)
+- [shadcn/ui](https://ui.shadcn.com)
 
 ---
 
-**Disclaimer**: This is a personal portfolio tracker for informational purposes only. It does not provide investment advice. Always do your own research before making investment decisions.
+**Disclaimer**: This is a personal finance tracker for informational purposes only. It does not provide investment advice. Always do your own research before making investment decisions.

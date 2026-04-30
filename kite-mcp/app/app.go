@@ -237,7 +237,10 @@ func (app *App) startServer(srv *http.Server, kcManager *kc.Manager, mcpServer *
 // setupMux creates and configures a new HTTP mux with common handlers
 func (app *App) setupMux(kcManager *kc.Manager) *http.ServeMux {
 	mux := http.NewServeMux()
-	mux.HandleFunc("/callback", kcManager.HandleKiteCallback())
+	kiteCallback := kcManager.HandleKiteCallback()
+	mux.HandleFunc("/callback", kiteCallback)
+	mux.HandleFunc("/callback/", kiteCallback)
+	app.serveHealthCheck(mux)
 	if app.Config.AdminSecretPath != "" {
 		mux.HandleFunc("/admin/", app.metrics.AdminHTTPHandler())
 	}
@@ -374,6 +377,23 @@ func (app *App) getStatusData() StatusPageData {
 		Version: app.Version,
 		Mode:    app.Config.AppMode,
 	}
+}
+
+// serveHealthCheck configures the endpoint used by Docker healthchecks.
+func (app *App) serveHealthCheck(mux *http.ServeMux) {
+	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet && r.Method != http.MethodHead {
+			w.Header().Set("Allow", "GET, HEAD")
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		if r.Method != http.MethodHead {
+			_, _ = w.Write([]byte(`{"status":"ok"}`))
+		}
+	})
 }
 
 // serveStatusPage configures the HTTP mux to serve status page using templates

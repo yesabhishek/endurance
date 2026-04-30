@@ -2,12 +2,16 @@ package kc
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"html/template"
+	"io"
 	"log/slog"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
 	kiteconnect "github.com/zerodha/gokiteconnect/v4"
@@ -101,10 +105,26 @@ const (
 	templateNotFoundError = "template not found"
 )
 
+var kiteAPIBaseURI = "https://api.kite.trade"
+
 var (
 	ErrSessionNotFound  = errors.New("MCP session not found or Kite session not associated, try to login again")
 	ErrInvalidSessionID = errors.New("invalid MCP session ID, please try logging in again")
 )
+
+type kiteAuthSession struct {
+	AccessToken string `json:"access_token"`
+	UserID      string `json:"user_id"`
+	UserName    string `json:"user_name"`
+	UserType    string `json:"user_type"`
+}
+
+type kiteEnvelope struct {
+	Status    string          `json:"status"`
+	Message   string          `json:"message"`
+	ErrorType string          `json:"error_type"`
+	Data      json.RawMessage `json:"data"`
+}
 
 type KiteSessionData struct {
 	Kite *KiteConnect
@@ -385,7 +405,7 @@ func (m *Manager) CompleteSession(mcpSessionID, kiteRequestToken string) error {
 		return err
 	}
 
-	m.Logger.Info("Completing Kite auth for MCP session", "session_id", mcpSessionID, "request_token", kiteRequestToken)
+	m.Logger.Info("Completing Kite auth for MCP session", "session_id", mcpSessionID)
 
 	kiteData, err := m.GetSession(mcpSessionID)
 	if err != nil {
@@ -394,7 +414,7 @@ func (m *Manager) CompleteSession(mcpSessionID, kiteRequestToken string) error {
 	}
 
 	m.Logger.Debug("Generating Kite session with request token")
-	userSess, err := kiteData.Kite.Client.GenerateSession(kiteRequestToken, m.apiSecret)
+	userSess, err := m.exchangeRequestToken(kiteRequestToken)
 	if err != nil {
 		m.Logger.Error("Failed to generate Kite session", "error", err)
 		return fmt.Errorf("failed to generate Kite session: %w", err)
@@ -420,6 +440,56 @@ func (m *Manager) CompleteSession(mcpSessionID, kiteRequestToken string) error {
 	}
 
 	return nil
+}
+
+func (m *Manager) exchangeRequestToken(kiteRequestToken string) (kiteAuthSession, error) {
+	checksum := sha256.Sum256([]byte(m.apiKey + kiteRequestToken + m.apiSecret))
+
+	params := url.Values{}
+	params.Add("api_key", m.apiKey)
+	params.Add("request_token", kiteRequestToken)
+	params.Set("checksum", fmt.Sprintf("%x", checksum))
+
+	req, err := http.NewRequest(http.MethodPost, kiteAPIBaseURI+"/session/token", strings.NewReader(params.Encode()))
+	if err != nil {
+		return kiteAuthSession{}, fmt.Errorf("failed to create Kite session request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("X-Kite-Version", "3")
+	req.Header.Set("User-Agent", "kite-mcp-server")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return kiteAuthSession{}, fmt.Errorf("Kite session request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+	if err != nil {
+		return kiteAuthSession{}, fmt.Errorf("failed to read Kite session response: %w", err)
+	}
+
+	var envelope kiteEnvelope
+	if err := json.Unmarshal(body, &envelope); err != nil {
+		return kiteAuthSession{}, fmt.Errorf("Kite returned an unparsable session response with HTTP %d", resp.StatusCode)
+	}
+
+	if resp.StatusCode >= http.StatusBadRequest || envelope.Status == "error" {
+		if envelope.Message != "" {
+			return kiteAuthSession{}, fmt.Errorf("Kite session request failed: %s", envelope.Message)
+		}
+		return kiteAuthSession{}, fmt.Errorf("Kite session request failed with HTTP %d", resp.StatusCode)
+	}
+
+	var session kiteAuthSession
+	if err := json.Unmarshal(envelope.Data, &session); err != nil {
+		return kiteAuthSession{}, fmt.Errorf("failed to parse Kite session auth fields: %w", err)
+	}
+	if session.AccessToken == "" {
+		return kiteAuthSession{}, errors.New("Kite session response did not include an access token")
+	}
+
+	return session, nil
 }
 
 // Session management utility methods
@@ -541,7 +611,7 @@ func (m *Manager) HandleKiteCallback() func(w http.ResponseWriter, r *http.Reque
 			return
 		}
 
-		m.Logger.Info("Processing Kite callback for MCP session ID", "session_id", mcpSessionID, "request_token", requestToken)
+		m.Logger.Info("Processing Kite callback for MCP session ID", "session_id", mcpSessionID)
 
 		if err := m.CompleteSession(mcpSessionID, requestToken); err != nil {
 			m.handleCallbackError(w, sessionErrorMessage, http.StatusInternalServerError, "Error completing Kite session for MCP session %s: %v", mcpSessionID, err)
