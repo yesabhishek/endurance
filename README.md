@@ -13,8 +13,10 @@ Endurance is a local-first personal finance app. It ingests financial emails fro
 
 - **Expense Tracking** — Gmail OAuth read-only sync for card bills, Google Pay/UPI, subscriptions, bills, broker statements, MFs, and gold emails.
 - **Investment Sync** — Read-only Kite MCP integration for holdings, positions, margins, profile, quotes, and mutual fund holdings.
+- **Async Sync Queue** — BullMQ and Redis keep Gmail and Kite updates outside request/response paths.
+- **In-App Notifications** — A notification bell tracks queued, running, completed, and failed sync activity.
 - **Finance Chat** — `@expenses`, `@investments`, `@emails`, `@portfolio`, and `@market` questions using Vercel AI SDK with a strict read-only tool allowlist.
-- **Minimalist UX** — Dense, monochrome shadcn/ui interface with tables, small type, tabular numbers, and no marketing chrome.
+- **Financial UX** — Interactive expense analytics, searchable/sortable tables, inferred credit cards, portfolio allocation, and holding impact views.
 - **Local SQLite** — Prisma Client models for normalized financial records and encrypted OAuth tokens.
 
 ## Quick Start
@@ -72,6 +74,57 @@ endurance/
 └── README.md
 ```
 
+## Architecture
+
+Endurance runs as a local-first Docker stack. The web app handles UI, OAuth callbacks, queueing, notifications, and read-only chat. A separate worker consumes sync jobs so long-running Gmail and Kite updates do not block page requests. SQLite remains the durable local store, while Redis is only the BullMQ job backend.
+
+```mermaid
+flowchart LR
+  User["User browser"] --> Web["Next.js web app<br/>App Router + API routes"]
+
+  Web --> SQLite[("SQLite<br/>Prisma schema")]
+  Web --> Redis[("Redis<br/>BullMQ queues")]
+  Web --> Chat["Finance chat<br/>read-only tools"]
+  Web --> Bell["Notification bell<br/>polls /api/notifications"]
+
+  Redis --> Worker["Sync worker<br/>BullMQ processor"]
+  Worker --> SQLite
+  Worker --> Gmail["Gmail API<br/>read-only email metadata"]
+  Worker --> KiteMCP["Kite MCP server<br/>localhost:8080"]
+  KiteMCP --> Kite["Zerodha Kite Connect"]
+
+  Chat --> SQLite
+  Chat --> KiteMCP
+
+  subgraph "Docker compose"
+    Web
+    Worker
+    Redis
+    KiteMCP
+  end
+```
+
+### Data Flow
+
+1. The user connects **Spending Data** through Gmail OAuth or **Investment Data** through Zerodha/Kite.
+2. Sync buttons create a `SyncRun` and enqueue a BullMQ job immediately.
+3. The worker claims the job, reads from Gmail or Kite MCP, normalizes records, and writes to SQLite.
+4. Gmail sync uses a durable cursor so later syncs process only new email history or timestamp-overlap fallbacks.
+5. Completion or failure writes an in-app notification, which appears in the top-bar notification bell.
+6. Dashboard, expenses, investments, and chat read from local normalized data.
+
+### Main Components
+
+| Component | Responsibility |
+|-----------|----------------|
+| `web/src/app` | Next.js pages and API routes |
+| `web/src/lib/gmail` | Gmail OAuth, incremental sync, parsing pipeline |
+| `web/src/lib/kite` | Kite MCP client and investment sync |
+| `web/src/lib/sync` | BullMQ queue, job enqueueing, worker orchestration |
+| `web/src/lib/finance` | Repository queries, analytics, credit-card detection, data shaping |
+| `web/prisma/schema.prisma` | SQLite data model for accounts, sync runs, cursors, notifications, transactions, holdings |
+| `kite-mcp` | Go MCP server wrapping Zerodha Kite Connect |
+
 ## Configuration
 
 ### Required Environment Variables
@@ -89,6 +142,8 @@ endurance/
 | `GOOGLE_CLIENT_ID` | Google OAuth client ID |
 | `GOOGLE_CLIENT_SECRET` | Google OAuth client secret |
 | `GOOGLE_REDIRECT_URI` | Usually `http://localhost:3000/api/gmail/callback` |
+| `GMAIL_SYNC_MONTHS` | Spending Data backfill window, defaults to `48` |
+| `GMAIL_SYNC_LIMIT` | Gmail fetch cap for backfill and fallback scans |
 | `AI_GATEWAY_API_KEY` | Optional Vercel AI Gateway key |
 | `AI_MODEL` | Optional AI model, defaults to `openai/gpt-5.4` |
 
@@ -97,8 +152,8 @@ endurance/
 | Route | Description |
 |-------|-------------|
 | `/` | Financial overview |
-| `/expenses` | Transactions, merchants, subscriptions, email evidence |
-| `/investments` | Holdings, snapshots, investment accounts |
+| `/expenses` | Expense analytics, searchable transactions, subscriptions, inferred credit cards |
+| `/investments` | Portfolio analytics, asset allocation, searchable holdings |
 | `/chat` | Read-only finance chat |
 | `/settings` | Gmail/Kite sync and local data controls |
 
@@ -140,14 +195,23 @@ npm run lint
 npm run build
 ```
 
+### CI
+
+GitHub Actions runs on pushes to `main`, pushes to `codex/**` branches, and pull requests:
+
+- Web: `npm ci`, `npm test`, `npm run lint`, `npm run build`
+- Kite MCP: `go test ./...`
+
 ## API Endpoints
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
 | `/api/gmail/connect` | GET | Start Gmail OAuth |
 | `/api/gmail/callback` | GET | Complete Gmail OAuth |
-| `/api/sync/gmail` | POST | Run Gmail financial email sync |
-| `/api/sync/kite` | POST | Run Kite MCP holdings/MF sync |
+| `/api/sync/gmail` | POST | Enqueue Spending Data sync |
+| `/api/sync/kite` | POST | Enqueue Investment Data sync |
+| `/api/notifications` | GET | Read recent sync notifications |
+| `/api/notifications/read` | POST | Mark one or all notifications as read |
 | `/api/chat` | POST | Stream read-only finance analysis |
 
 ## License
