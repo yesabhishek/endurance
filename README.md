@@ -1,230 +1,146 @@
 # Endurance
 
-> A minimalist private finance workspace for expenses, investments, and read-only financial analysis.
+> Your Zerodha portfolio by sector, with a private analyst you can ask anything. Self-hosted, read-only, bring your own keys.
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Next.js](https://img.shields.io/badge/next.js-16-black.svg)
-![Prisma](https://img.shields.io/badge/prisma-sqlite-black.svg)
-![Docker](https://img.shields.io/badge/docker-ready-blue.svg)
+![Postgres](https://img.shields.io/badge/postgres-16-336791.svg)
 
-Endurance is a local-first personal finance app. It ingests financial emails from Gmail, syncs investments through the Zerodha Kite MCP server, and exposes a read-only finance chat interface for technical expense, portfolio, and risk questions.
+Endurance connects to **your own** Kite Connect app, syncs your holdings, mutual funds and positions, classifies every stock into its NSE sector, and shows how your money is spread: by sector, asset class and fund category, against limits you set. A chat assistant answers questions about your portfolio using **your own** OpenAI, Anthropic, Google or Vercel AI Gateway key.
 
-## Features
+The dashboard shows:
 
-- **Expense Tracking** — Gmail OAuth read-only sync for card bills, Google Pay/UPI, subscriptions, bills, broker statements, MFs, and gold emails.
-- **Investment Sync** — Read-only Kite MCP integration for holdings, positions, margins, profile, quotes, and mutual fund holdings.
-- **Async Sync Queue** — BullMQ and Redis keep Gmail and Kite updates outside request/response paths.
-- **In-App Notifications** — A notification bell tracks queued, running, completed, and failed sync activity.
-- **Finance Chat** — `@expenses`, `@investments`, `@emails`, `@portfolio`, and `@market` questions using Vercel AI SDK with a strict read-only tool allowlist.
-- **Financial UX** — Interactive expense analytics, searchable/sortable tables, inferred credit cards, portfolio allocation, and holding impact views.
-- **Local SQLite** — Prisma Client models for normalized financial records and encrypted OAuth tokens.
+- **Value over time**: current value against money put in, from 1 month to all history.
+- **Portfolio heatmap**: every holding sized by value, grouped by sector, coloured by today's move or return since purchase.
+- **Risk zones**: five checks (largest stock and sector against your limits, top-5 share, effective number of holdings, money in losing positions), each marked comfortable, watch or high.
+- **Risk map**: each stock by its share of your money against its return, with the concentration and below-cost zones shaded.
+- **20-year outlook**: a seeded Monte Carlo fan chart with monthly SIP and step-up. Switch on **AI forecast** and your own model sets the return and volatility assumptions for your actual holdings; the math and the assumptions stay on screen.
+- **Ask Endurance**: a chat panel docked beside every page (⌘K). Every chart has an Ask button that sends a question about what it shows.
 
-## Quick Start
+- **Read-only.** Endurance never calls Kite's order endpoints. It cannot place, modify or cancel orders.
+- **Your keys stay yours.** Kite and AI keys are entered in the app, encrypted at rest, and never sent to the browser.
+- **Your data stays on your machine.** Everything lives in your own Postgres.
 
-### Prerequisites
+## Quick start
 
-- Node.js 22+ for local web development
-- Docker and Docker Compose for full stack local runtime
-- Zerodha Kite Connect credentials for the local Kite MCP server
-- Google OAuth credentials for Gmail ingestion
+You need [Docker](https://docs.docker.com/get-docker/) and a Zerodha account.
 
-### Setup
-
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/yesabhishek/endurance.git
-   cd endurance
-   ```
-
-2. **Configure environment variables**
-   ```bash
-   cp .env.example .env
-   ```
-   
-   Edit `.env` with your credentials:
-   ```env
-   KITE_API_KEY=your_kite_api_key
-   KITE_API_SECRET=your_kite_api_secret
-   APP_ENCRYPTION_KEY=replace-with-a-long-random-local-secret
-   GOOGLE_CLIENT_ID=your_google_oauth_client_id
-   GOOGLE_CLIENT_SECRET=your_google_oauth_client_secret
-   ```
-
-3. **Start the application**
-   ```bash
-   docker compose up --build
-   ```
-
-4. **Open in browser**
-   
-   Visit [http://localhost:3000](http://localhost:3000).
-
-## Project Structure
-
+```bash
+git clone https://github.com/yesabhishek/endurance.git
+cd endurance
+./scripts/setup.sh          # writes .env with random secrets
+docker compose up --build
 ```
-endurance/
-├── web/                    # Next.js App Router app and worker
-│   ├── src/app/            # Routes and API handlers
-│   ├── src/components/     # shadcn/ui and app components
-│   ├── src/lib/            # Gmail, Kite, finance, DB libraries
-│   ├── prisma/             # Prisma schema
-│   └── scripts/init-db.mjs # SQLite initializer
-├── kite-mcp/               # Kite MCP Server (Go)
-├── .env.example            # Environment template
-└── README.md
-```
+
+Open **http://localhost:3000**, create your account, then go to **Settings**:
+
+1. **Create a Kite Connect app** at [developers.kite.trade](https://developers.kite.trade/apps). The free *Personal* plan is enough for holdings and positions.
+2. Set the app's **Redirect URL** to `http://localhost:3000/api/kite/callback` (Settings shows the exact value with a copy button).
+3. Paste the app's **API key and secret** into Settings, then click **Log in to Kite**.
+4. Add an **AI provider key** and pick a model. The key is verified by listing the models it can use.
+
+Your portfolio syncs right after login. Kite ends every session early each morning (an exchange rule), so log in again each day to refresh prices; the dashboard keeps showing your last snapshot meanwhile.
+
+## What you get
+
+| Page | What it shows |
+| --- | --- |
+| Overview | Value, today's change, unrealised P&L, sectors held, sector bars against your limit, largest holdings, breaches of your limits |
+| Holdings | Every holding with sector and weight, concentration, value over time, open positions |
+| Ask | Chat with source chips showing which data each answer used |
+| Spending | Optional: expenses, subscriptions and cards parsed from Gmail (read-only) |
+| Settings | Kite app and login, AI keys and model, your limits, Gmail, data reset |
+
+Sectors come from NSE's index constituent lists (Nifty Total Market, about 750 companies), refreshed weekly by your own install. Mutual funds and ETFs are grouped by category.
 
 ## Architecture
 
-Endurance runs as a local-first Docker stack. The web app handles UI, OAuth callbacks, queueing, notifications, and read-only chat. A separate worker consumes sync jobs so long-running Gmail and Kite updates do not block page requests. SQLite remains the durable local store, while Redis is only the BullMQ job backend.
-
 ```mermaid
 flowchart LR
-  User["User browser"] --> Web["Next.js web app<br/>App Router + API routes"]
-
-  Web --> SQLite[("SQLite<br/>Prisma schema")]
-  Web --> Redis[("Redis<br/>BullMQ queues")]
-  Web --> Chat["Finance chat<br/>read-only tools"]
-  Web --> Bell["Notification bell<br/>polls /api/notifications"]
-
-  Redis --> Worker["Sync worker<br/>BullMQ processor"]
-  Worker --> SQLite
-  Worker --> Gmail["Gmail API<br/>read-only email metadata"]
-  Worker --> KiteMCP["Kite MCP server<br/>localhost:8080"]
-  KiteMCP --> Kite["Zerodha Kite Connect"]
-
-  Chat --> SQLite
-  Chat --> KiteMCP
-
-  subgraph "Docker compose"
-    Web
-    Worker
-    Redis
-    KiteMCP
-  end
+  Browser["Browser<br/>HttpOnly session cookie"] --> Proxy["proxy.ts<br/>host allowlist · origin check · CSP"]
+  Proxy --> Web["Next.js<br/>pages + API routes"]
+  Web --> PG[("Postgres<br/>every row has user_id")]
+  Web --> Redis[("Redis<br/>queue + rate limits")]
+  Redis --> Worker["Sync worker"]
+  Worker --> Kite["Kite Connect API<br/>read-only endpoints"]
+  Worker --> NSE["NSE sector lists"]
+  Worker --> PG
+  Web --> AI["Your AI provider<br/>OpenAI · Anthropic · Google · Gateway"]
 ```
 
-### Data Flow
+- **Web** handles sign-in, settings, dashboards, the Kite login round trip and chat.
+- **Worker** runs syncs from a BullMQ queue so slow API calls never block a page. Run more workers to sync more users in parallel.
+- **Migrate** is a one-shot container that applies Prisma migrations before the app starts.
 
-1. The user connects **Spending Data** through Gmail OAuth or **Investment Data** through Zerodha/Kite.
-2. Sync buttons create a `SyncRun` and enqueue a BullMQ job immediately.
-3. The worker claims the job, reads from Gmail or Kite MCP, normalizes records, and writes to SQLite.
-4. Gmail sync uses a durable cursor so later syncs process only new email history or timestamp-overlap fallbacks.
-5. Completion or failure writes an in-app notification, which appears in the top-bar notification bell.
-6. Dashboard, expenses, investments, and chat read from local normalized data.
+The web tier keeps no state in memory (sessions live in Postgres, rate limits in Redis), so you can run several copies behind a load balancer.
 
-### Main Components
+## Security model
 
-| Component | Responsibility |
-|-----------|----------------|
-| `web/src/app` | Next.js pages and API routes |
-| `web/src/lib/gmail` | Gmail OAuth, incremental sync, parsing pipeline |
-| `web/src/lib/kite` | Kite MCP client and investment sync |
-| `web/src/lib/sync` | BullMQ queue, job enqueueing, worker orchestration |
-| `web/src/lib/finance` | Repository queries, analytics, credit-card detection, data shaping |
-| `web/prisma/schema.prisma` | SQLite data model for accounts, sync runs, cursors, notifications, transactions, holdings |
-| `kite-mcp` | Go MCP server wrapping Zerodha Kite Connect |
+| Threat | Protection |
+| --- | --- |
+| Someone else on your network opens the app | Accounts with scrypt-hashed passwords and server-side sessions; the app is published on `127.0.0.1` only by default |
+| A website you visit sends requests to your local app (CSRF) | `proxy.ts` rejects cross-site writes by `Origin`/`Sec-Fetch-Site`; cookies are `SameSite=Lax` |
+| DNS rebinding | Requests are refused unless the `Host` is loopback, `APP_URL` or listed in `ALLOWED_HOSTS` |
+| Database leak exposes keys | Kite secrets, access tokens and AI keys are AES-256-GCM encrypted with a key derived from `APP_SECRET`, bound to the owning row; session ids are stored hashed |
+| One user reading another's data | Every user-owned table has `userId`; app code reaches them only through `tenantDb(userId)`, which scopes every query and is unit-tested |
+| Login CSRF on Kite or Google OAuth | Random `state` checked on callback; Google also uses PKCE |
+| Prompt injection through broker or email text | Chat tools are read-only, bound to the signed-in user, return minimal fields, and the UI renders no links or images from model output |
+| Brute force | Per-IP and per-account rate limits on sign-in |
+| XSS and clickjacking | Strict nonce-based CSP, `frame-ancestors 'none'`, `nosniff`, HSTS on HTTPS |
+| Leaked secrets in git | CI runs gitleaks on every push and pull request; only `*.example` env files are tracked |
+| Vulnerable dependencies | CI fails on unreviewed high or critical advisories; Dependabot opens weekly updates |
 
-## Configuration
+See [SECURITY.md](SECURITY.md) for rotating `APP_SECRET` and reporting issues.
 
-### Required Environment Variables
+## Running on a server
 
-| Variable | Description |
-|----------|-------------|
-| `KITE_API_KEY` | Kite Connect API key for the MCP server |
-| `KITE_API_SECRET` | Kite Connect API secret for the MCP server |
-| `APP_ENCRYPTION_KEY` | Local encryption key for OAuth tokens |
-
-### Optional Environment Variables
-
-| Variable | Description |
-|----------|-------------|
-| `GOOGLE_CLIENT_ID` | Google OAuth client ID |
-| `GOOGLE_CLIENT_SECRET` | Google OAuth client secret |
-| `GOOGLE_REDIRECT_URI` | Usually `http://localhost:3000/api/gmail/callback` |
-| `GMAIL_SYNC_MONTHS` | Spending Data backfill window, defaults to `48` |
-| `GMAIL_SYNC_LIMIT` | Gmail fetch cap for backfill and fallback scans |
-| `AI_GATEWAY_API_KEY` | Optional Vercel AI Gateway key |
-| `AI_MODEL` | Optional AI model, defaults to `openai/gpt-5.4` |
-
-## Pages
-
-| Route | Description |
-|-------|-------------|
-| `/` | Financial overview |
-| `/expenses` | Expense analytics, searchable transactions, subscriptions, inferred credit cards |
-| `/investments` | Portfolio analytics, asset allocation, searchable holdings |
-| `/chat` | Read-only finance chat |
-| `/settings` | Gmail/Kite sync and local data controls |
-
-## Security
-
-This project takes security seriously:
-
-- **No hardcoded credentials** — All secrets are loaded from environment variables
-- **`.env` is gitignored** — Your credentials are never committed
-- **Encrypted OAuth tokens** — Gmail tokens are encrypted locally with `APP_ENCRYPTION_KEY`
-- **Normalized email storage** — The app stores source IDs, headers, snippets, parsed amounts, and metadata; it does not persist raw email bodies
-- **Read-only finance tools** — Chat can query local records and read-only Kite MCP tools only
-
-### Important Security Notes
-
-1. **Never commit `.env`** — The `.gitignore` file excludes it
-2. **Rotate your API keys** if you accidentally expose them
-3. **Use a long random `APP_ENCRYPTION_KEY`** before connecting Gmail
+1. Put Endurance behind HTTPS (Caddy, nginx or a tunnel) and set `APP_URL=https://your-domain`. Secure cookies, HSTS and `upgrade-insecure-requests` switch on automatically.
+2. Set `TRUST_PROXY=true` if the proxy sets `X-Forwarded-For`, so rate limits see real client addresses.
+3. Change the Kite app's redirect URL to `https://your-domain/api/kite/callback`.
+4. Set `ALLOW_SIGNUP=true` only if other people should be able to create accounts. Each account must use its own Kite Connect app; Zerodha binds an app to one client ID unless it approves multi-user access.
+5. Back up the `postgres-data` volume, and keep `APP_SECRET` somewhere safe. Without it, stored keys can't be decrypted.
 
 ## Development
 
-### Running web locally without Docker
-
 ```bash
+./scripts/setup.sh
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d postgres redis
 cd web
-cp .env.example .env
 npm install
-npm run db:generate
-npm run db:init
-npm run dev
+npm run db:migrate
+npm run dev        # http://localhost:3000
+npm run worker     # in a second terminal
 ```
 
-### Running tests
+Checks that CI runs: `npm run audit:prod`, `npm run typecheck`, `npm test`, `npm run lint`, `npm run build`, plus a migration drift check against a fresh Postgres and a gitleaks scan.
 
-```bash
-cd web
-npm test
-npm run lint
-npm run build
+## Troubleshooting
+
+- **"Kite rejected the login"**: the API secret doesn't match the app, or the redirect URL in the Kite console isn't exactly `APP_URL/api/kite/callback`.
+- **"That Kite login didn't start from this browser session"**: start the login from Settings in the same browser; the state cookie expires after 10 minutes.
+- **Prices didn't update this morning**: Kite sessions end daily. Click **Log in to Kite** on the dashboard.
+- **"Unknown host"**: add the host name you use to `ALLOWED_HOSTS`.
+- **Sector shows "Unclassified"**: the stock isn't in NSE's Total Market list (often SME or newly listed shares).
+
+## Project structure
+
 ```
-
-### CI
-
-GitHub Actions runs on pushes to `main`, pushes to `codex/**` branches, and pull requests:
-
-- Web: `npm ci`, `npm test`, `npm run lint`, `npm run build`
-- Kite MCP: `go test ./...`
-
-## API Endpoints
-
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/api/gmail/connect` | GET | Start Gmail OAuth |
-| `/api/gmail/callback` | GET | Complete Gmail OAuth |
-| `/api/sync/gmail` | POST | Enqueue Spending Data sync |
-| `/api/sync/kite` | POST | Enqueue Investment Data sync |
-| `/api/notifications` | GET | Read recent sync notifications |
-| `/api/notifications/read` | POST | Mark one or all notifications as read |
-| `/api/chat` | POST | Stream read-only finance analysis |
+endurance/
+├── web/                       Next.js app, worker, Prisma schema and migrations
+│   ├── src/proxy.ts           request guard and security headers
+│   ├── src/app/               pages and API routes
+│   ├── src/lib/               auth, crypto, tenant db, Kite, AI, analytics
+│   └── prisma/                schema.prisma and migrations
+├── scripts/setup.sh           generates .env with random secrets
+├── docker-compose.yml         postgres, redis, migrate, web, worker
+├── docker-compose.dev.yml     publishes postgres and redis on 127.0.0.1 for local dev
+└── kite-mcp/                  legacy Go MCP server, no longer used by the app
+```
 
 ## License
 
-MIT License — see [LICENSE](LICENSE) for details.
-
-## Acknowledgments
-
-- [Zerodha Kite Connect](https://kite.trade/) and Kite MCP
-- [Google Gmail API](https://developers.google.com/gmail/api)
-- [Vercel AI SDK](https://ai-sdk.dev/docs)
-- [shadcn/ui](https://ui.shadcn.com)
+MIT. See [LICENSE](LICENSE).
 
 ---
 
-**Disclaimer**: This is a personal finance tracker for informational purposes only. It does not provide investment advice. Always do your own research before making investment decisions.
+Endurance is an independent project, not affiliated with or endorsed by Zerodha. It shows analysis of your own data and does not provide investment advice.

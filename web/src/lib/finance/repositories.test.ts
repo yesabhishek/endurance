@@ -54,7 +54,7 @@ describe("finance repository helpers", () => {
           lastSeenAt: new Date("2026-04-02T10:00:00"),
           status: "ACTIVE",
         },
-      ],
+      ] as never,
       range,
     );
 

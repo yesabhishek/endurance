@@ -1,106 +1,100 @@
-import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
-import { PageHeader } from "@/components/app/page-header";
-import { EmptyState } from "@/components/data/empty-state";
+import type { Metadata } from "next";
+import { KpiStrip } from "@/components/dashboard/kpi-strip";
+import { Panel } from "@/components/dashboard/panel";
+import { SectorBars } from "@/components/dashboard/sector-bars";
+import { ValueChart } from "@/components/dashboard/value-chart";
 import { HoldingTable } from "@/components/data/holding-table";
-import { InvestmentAnalytics } from "@/components/data/investment-analytics";
-import { StatGrid } from "@/components/data/stat-grid";
-import { getInvestmentsData } from "@/lib/finance/repositories";
-import { currency, percentage, shortDate } from "@/lib/format";
+import { requireUserDb } from "@/lib/auth/guard";
+import { getPortfolio, getValueHistory } from "@/lib/finance/portfolio";
+import { asOfLabel, inr, pct } from "@/lib/format";
+import { cn } from "@/lib/utils";
 
+export const metadata: Metadata = { title: "Holdings" };
 export const dynamic = "force-dynamic";
 
 export default async function InvestmentsPage() {
-  const data = await getInvestmentsData();
-  const mfCount = data.holdings.filter((item) => item.assetClass === "MUTUAL_FUND").length;
-  const stockCount = data.holdings.filter((item) => item.assetClass === "STOCK").length;
+  const { user, db } = await requireUserDb();
+  const [portfolio, history] = await Promise.all([getPortfolio(db, user.id), getValueHistory(db, 400)]);
 
   return (
     <>
-      <PageHeader
-        eyebrow="Investments"
-        title="Portfolio analytics"
-        description="Review holdings, asset allocation, and unrealized gains."
-      />
+      <div className="flex flex-col gap-1">
+        <h1 className="font-display text-2xl md:text-[1.75rem]">Holdings</h1>
+        <p className="text-sm text-muted-foreground">Everything in your Kite account, as of {asOfLabel(portfolio.asOf)}</p>
+      </div>
 
-      <StatGrid
-        stats={[
-          { label: "Portfolio value", value: currency(data.analytics.totalValue, true), hint: `${data.holdings.length} holdings` },
+      <KpiStrip
+        items={[
+          { label: "Current value", value: inr(portfolio.total), sub: `${portfolio.holdings.length} holdings`, tone: "muted" },
+          { label: "Investment", value: inr(portfolio.invested), tone: "muted" },
           {
-            label: "Unrealized P&L",
-            value: currency(data.analytics.totalPnl, true),
-            hint: percentage(data.analytics.pnlPct),
-            tone: data.analytics.totalPnl >= 0 ? "positive" : "negative",
+            label: "Total P&L",
+            value: inr(portfolio.totalPnl, { signed: true }),
+            sub: pct(portfolio.totalPnlPct, { signed: true }),
+            tone: portfolio.totalPnl >= 0 ? "gain" : "loss",
           },
-          { label: "Stocks", value: String(stockCount), hint: "Direct equity holdings" },
-          { label: "Mutual funds", value: String(mfCount), hint: "Fund holdings" },
+          {
+            label: "Concentration",
+            value: pct(portfolio.concentration.top5Pct),
+            sub: `in your top 5 · behaves like ${portfolio.concentration.effectivePositions.toFixed(1)} equal holdings`,
+            tone: "muted",
+          },
         ]}
       />
 
-      <InvestmentAnalytics analytics={data.analytics} />
+      <div className="grid grid-cols-1 gap-6 @4xl:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)]">
+        <Panel id="sector" title="Stocks by sector" subtitle="NSE sectors, as a share of your direct equity.">
+          <SectorBars slices={portfolio.sectors} limitPct={portfolio.limits.sectorLimitPct} emptyText="No direct stock holdings yet." />
+        </Panel>
+        <Panel id="trend" title="Value over time" subtitle="One point per day Endurance synced.">
+          <ValueChart points={history} />
+        </Panel>
+      </div>
 
-      <section className="grid gap-6 lg:grid-cols-[1fr_380px]">
-        <div className="space-y-3">
-          <h2 className="text-sm font-semibold">Holdings</h2>
-          {data.holdings.length ? (
-            <HoldingTable holdings={data.holdings} />
-          ) : (
-            <EmptyState title="No investments yet" detail="Connect Investment Data and run an update from Settings." />
-          )}
-        </div>
-
-        <aside className="space-y-6">
-          <section className="space-y-3">
-            <h2 className="text-sm font-semibold">Accounts</h2>
-            <div className="rounded-lg border">
-              {data.accounts.length ? (
-                data.accounts.map((account, index) => (
-                  <div key={account.id}>
-                    <div className="p-3">
-                      <div className="flex items-center justify-between">
-                        <div className="font-medium">{account.accountName ?? account.provider}</div>
-                        <Badge variant="outline" className="rounded-md font-mono text-[10px]">
-                          CONNECTED
-                        </Badge>
-                      </div>
-                      <div className="mt-1 font-mono text-xs text-muted-foreground">
-                        {account.accountRef ?? "default"}
-                      </div>
-                    </div>
-                    {index < data.accounts.length - 1 ? <Separator /> : null}
-                  </div>
-                ))
-              ) : (
-                <div className="p-3 text-sm text-muted-foreground">No investment accounts yet.</div>
-              )}
-            </div>
-          </section>
-
-          <section className="space-y-3">
-            <h2 className="text-sm font-semibold">Recent valuation points</h2>
-            <div className="rounded-lg border">
-              {data.snapshots.length ? (
-                data.snapshots.slice(0, 12).map((snapshot, index) => (
-                  <div key={snapshot.id}>
-                    <div className="p-3">
-                      <div className="flex justify-between gap-3">
-                        <div className="truncate font-medium">{snapshot.holding.name}</div>
-                        <div className="font-mono text-xs">{currency(snapshot.value)}</div>
-                      </div>
-                      <div className="mt-1 text-xs text-muted-foreground">
-                        {shortDate(snapshot.capturedAt)}
-                      </div>
-                    </div>
-                    {index < Math.min(data.snapshots.length, 12) - 1 ? <Separator /> : null}
-                  </div>
-                ))
-              ) : (
-                <div className="p-3 text-sm text-muted-foreground">No snapshots captured yet.</div>
-              )}
-            </div>
-          </section>
-        </aside>
+      <section className="flex flex-col gap-3" aria-labelledby="holdings-h">
+        <h2 id="holdings-h" className="text-[0.95rem] font-semibold">
+          Holdings
+        </h2>
+        {portfolio.holdings.length ? (
+          <HoldingTable holdings={portfolio.holdings} />
+        ) : (
+          <p className="rounded-lg border border-dashed p-6 text-sm text-muted-foreground">Connect Kite in Settings to see your holdings.</p>
+        )}
       </section>
+
+      {portfolio.positions.length ? (
+        <section className="flex flex-col gap-3" aria-labelledby="positions-h">
+          <h2 id="positions-h" className="text-[0.95rem] font-semibold">
+            Open positions
+          </h2>
+          <div className="overflow-x-auto rounded-lg border bg-card">
+            <table className="w-full min-w-[560px] text-sm">
+              <thead>
+                <tr className="border-b text-left text-xs text-muted-foreground">
+                  <th className="px-4 py-2.5 font-medium">Instrument</th>
+                  <th className="px-4 py-2.5 font-medium">Product</th>
+                  <th className="px-4 py-2.5 text-right font-medium">Qty</th>
+                  <th className="px-4 py-2.5 text-right font-medium">Avg</th>
+                  <th className="px-4 py-2.5 text-right font-medium">LTP</th>
+                  <th className="px-4 py-2.5 text-right font-medium">P&amp;L</th>
+                </tr>
+              </thead>
+              <tbody className="tabular-nums">
+                {portfolio.positions.map((p) => (
+                  <tr key={`${p.exchange}:${p.symbol}:${p.product}`} className="border-b last:border-0">
+                    <td className="px-4 py-2.5 font-semibold">{p.symbol}</td>
+                    <td className="px-4 py-2.5 text-muted-foreground">{p.product}</td>
+                    <td className="px-4 py-2.5 text-right">{p.quantity}</td>
+                    <td className="px-4 py-2.5 text-right">{p.averagePrice?.toFixed(2) ?? "—"}</td>
+                    <td className="px-4 py-2.5 text-right">{p.lastPrice?.toFixed(2) ?? "—"}</td>
+                    <td className={cn("px-4 py-2.5 text-right", p.pnl >= 0 ? "text-gain" : "text-loss")}>{inr(p.pnl, { signed: true })}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      ) : null}
     </>
   );
 }

@@ -278,7 +278,7 @@ function Breakdown({ title, items }: { title: string; items: BreakdownItem[] }) 
               </div>
               <div className="h-1.5 overflow-hidden rounded-full bg-muted">
                 <div
-                  className="h-full rounded-full bg-primary transition-all group-hover:bg-emerald-700"
+                  className="h-full rounded-full bg-primary transition-all group-hover:bg-brand"
                   style={{ width: `${Math.min(100, item.pct)}%` }}
                 />
               </div>

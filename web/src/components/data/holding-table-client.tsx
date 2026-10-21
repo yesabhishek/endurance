@@ -151,7 +151,7 @@ export function HoldingTableClient({ holdings }: { holdings: HoldingTableRow[] }
                           <Detail label="Quantity" value={holding.quantity} />
                           <Detail label="Average price" value={currency(holding.averagePrice)} />
                           <Detail label="Last price" value={currency(holding.lastPrice)} />
-                          <Detail label="Account" value={holding.account} />
+                          <Detail label="Sector" value={holding.account} />
                           <Detail label="Updated" value={holding.updatedLabel} />
                         </dl>
                       </div>

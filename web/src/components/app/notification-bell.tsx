@@ -80,7 +80,7 @@ export function NotificationBell() {
   }, [loadNotifications]);
 
   async function markAllRead() {
-    const response = await fetch("/api/notifications/read", {
+    const response = await fetch("/api/notifications", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ all: true }),

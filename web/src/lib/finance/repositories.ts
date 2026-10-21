@@ -11,7 +11,7 @@ import {
   startOfWeek,
   startOfYear,
 } from "date-fns";
-import { getDb } from "@/lib/db";
+import type { TenantDb } from "@/lib/db";
 
 export type ExpenseRangePreset = "week" | "month" | "year" | "custom";
 
@@ -78,18 +78,16 @@ type SnapshotWithHolding = InvestmentSnapshot & {
   holding: Holding;
 };
 
-export async function getFinancialOverview() {
-  const db = getDb();
+export async function getFinancialOverview(db: TenantDb) {
   const range = parseExpenseRange({ preset: "month" });
 
-  const [rawTransactions, holdings, recurring, lastSyncs, accounts] = await Promise.all([
+  const [rawTransactions, recurring, lastSyncs, accounts] = await Promise.all([
     db.transaction.findMany({
       where: { transactionDate: { gte: range.from, lte: range.to } },
       include: { merchant: true, emailSource: { include: { parsed: { select: { kind: true } } } } },
       orderBy: { transactionDate: "desc" },
       take: 1000,
     }),
-    db.holding.findMany({ orderBy: { currentValue: "desc" } }),
     db.recurringPayment.findMany({
       include: { merchant: true },
       orderBy: { lastSeenAt: "desc" },
@@ -101,29 +99,20 @@ export async function getFinancialOverview() {
 
   const transactions = rawTransactions.filter(isExpenseTransaction);
   const expenseTotal = transactions.reduce((sum, item) => sum + Number(item.amount), 0);
-  const portfolioValue = holdings.reduce((sum, item) => sum + Number(item.currentValue ?? 0), 0);
-  const portfolioPnl = holdings.reduce((sum, item) => sum + Number(item.pnl ?? 0), 0);
   const recurringTotal = recurring.reduce((sum, item) => sum + Number(item.amount ?? 0), 0);
-  const hasSpendingData = accounts.some((account) => account.provider === "GMAIL" && account.status === "connected");
-  const hasInvestmentData = accounts.some((account) => account.provider === "KITE" && account.status === "connected");
+  const hasSpendingData = accounts.some((account) => account.provider === "GMAIL" && account.status === "CONNECTED");
 
   return {
     expenseTotal,
-    portfolioValue,
-    portfolioPnl,
     recurringTotal,
     transactions: transactions.slice(0, 10),
-    holdings: holdings.slice(0, 10),
     recurring,
     lastSyncs,
     hasSpendingData,
-    hasInvestmentData,
-    hasAnySource: hasSpendingData || hasInvestmentData,
   };
 }
 
-export async function getExpensesData(input: ExpenseRangeInput = {}) {
-  const db = getDb();
+export async function getExpensesData(db: TenantDb, input: ExpenseRangeInput = {}) {
   const range = parseExpenseRange(input);
   const [rawTransactions, merchants, recurring, cardEmailSignals] = await Promise.all([
     db.transaction.findMany({
@@ -154,52 +143,6 @@ export async function getExpensesData(input: ExpenseRangeInput = {}) {
   const creditCards = detectCreditCards(cardEmailSignals, rawTransactions);
 
   return { transactions, merchants, recurring, creditCards, range, analytics };
-}
-
-export async function getInvestmentsData() {
-  const db = getDb();
-  const [holdings, snapshots, accounts] = await Promise.all([
-    db.holding.findMany({
-      include: { account: true },
-      orderBy: [{ assetClass: "asc" }, { currentValue: "desc" }],
-    }),
-    db.investmentSnapshot.findMany({
-      include: { holding: true },
-      orderBy: { capturedAt: "desc" },
-      take: 40,
-    }),
-    db.investmentAccount.findMany({ orderBy: { updatedAt: "desc" } }),
-  ]);
-  const analytics = buildInvestmentAnalytics(holdings, snapshots);
-
-  return { holdings, snapshots, accounts, analytics };
-}
-
-export async function buildChatContext() {
-  const db = getDb();
-  const [transactions, recurring, holdings, emailEvidence] = await Promise.all([
-    db.transaction.findMany({
-      include: { merchant: true },
-      orderBy: { transactionDate: "desc" },
-      take: 30,
-    }),
-    db.recurringPayment.findMany({
-      include: { merchant: true },
-      orderBy: { lastSeenAt: "desc" },
-      take: 20,
-    }),
-    db.holding.findMany({
-      orderBy: { currentValue: "desc" },
-      take: 30,
-    }),
-    db.parsedFinancialEmail.findMany({
-      include: { emailSource: true },
-      orderBy: { createdAt: "desc" },
-      take: 20,
-    }),
-  ]);
-
-  return { transactions, recurring, holdings, emailEvidence };
 }
 
 export function parseExpenseRange(input: ExpenseRangeInput = {}, now = new Date()): ExpenseRange {

@@ -1,15 +1,37 @@
+// Every user-owned table carries `userId`. Application code reaches these tables
+// only through `tenantDb(userId)` (src/lib/db.ts), which scopes every query.
+
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  OWNER
+  MEMBER
+}
+
+enum CredentialKind {
+  KITE_APP
+  OPENAI
+  ANTHROPIC
+  GOOGLE
+  AI_GATEWAY
 }
 
 enum AccountProvider {
   GMAIL
   KITE
+}
+
+enum ConnectionStatus {
+  CONNECTED
+  EXPIRED
+  DISCONNECTED
 }
 
 enum SyncSource {
@@ -59,25 +81,142 @@ enum AssetClass {
   OTHER
 }
 
+// ---------------------------------------------------------------------------
+// Identity
+// ---------------------------------------------------------------------------
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String?
+  passwordHash String
+  role         UserRole @default(MEMBER)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  sessions             Session[]
+  settings             UserSettings?
+  credentials          Credential[]
+  connectedAccounts    ConnectedAccount[]
+  oauthTokens          OAuthToken[]
+  syncCursors          SyncCursor[]
+  syncRuns             SyncRun[]
+  notifications        Notification[]
+  emailSources         EmailSource[]
+  parsedEmails         ParsedFinancialEmail[]
+  merchants            Merchant[]
+  transactions         Transaction[]
+  recurringPayments    RecurringPayment[]
+  investmentAccounts   InvestmentAccount[]
+  holdings             Holding[]
+  positions            Position[]
+  investmentSnapshots  InvestmentSnapshot[]
+  chatThreads          ChatThread[]
+  chatMessages         ChatMessage[]
+  auditEvents          AuditEvent[]
+}
+
+// Server-side sessions. `id` is the SHA-256 of the cookie token, so a database
+// leak does not reveal usable session cookies.
+model Session {
+  id         String   @id
+  userId     String
+  createdAt  DateTime @default(now())
+  expiresAt  DateTime
+  lastSeenAt DateTime @default(now())
+  userAgent  String?
+  ip         String?
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model UserSettings {
+  userId              String   @id
+  singleStockLimitPct Decimal  @default(10) @db.Decimal(5, 2)
+  sectorLimitPct      Decimal  @default(25) @db.Decimal(5, 2)
+  chatProvider        CredentialKind?
+  chatModel           String?
+  aiDataConsentAt     DateTime?
+  updatedAt           DateTime @updatedAt
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// Encrypted per-user secrets: the user's own Kite Connect app and AI provider keys.
+// `secretEncrypted` is AES-256-GCM bound to (userId, kind); `hint` is safe to show.
+model Credential {
+  id              String         @id @default(cuid())
+  userId          String
+  kind            CredentialKind
+  secretEncrypted String
+  publicId        String?
+  hint            String
+  lastVerifiedAt  DateTime?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  user            User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, kind])
+}
+
+model AuditEvent {
+  id           String   @id @default(cuid())
+  userId       String?
+  action       String
+  ip           String?
+  userAgent    String?
+  metadataJson String?
+  createdAt    DateTime @default(now())
+  user         User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([action, createdAt])
+}
+
+// ---------------------------------------------------------------------------
+// Connections and sync
+// ---------------------------------------------------------------------------
+
 model ConnectedAccount {
-  id           String          @id @default(cuid())
+  id           String           @id @default(cuid())
+  userId       String
   provider     AccountProvider
-  accountEmail String?
+  externalId   String
   displayName  String?
-  status       String          @default("connected")
+  status       ConnectionStatus @default(CONNECTED)
   scope        String?
-  createdAt    DateTime        @default(now())
-  updatedAt    DateTime        @updatedAt
-  tokens       OAuthToken[]
+  connectedAt  DateTime         @default(now())
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  user         User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token        OAuthToken?
   syncRuns     SyncRun[]
   syncCursors  SyncCursor[]
 
-  @@unique([provider, accountEmail])
-  @@index([provider])
+  @@unique([userId, provider, externalId])
+  @@index([userId, provider])
+}
+
+model OAuthToken {
+  id                    String           @id @default(cuid())
+  userId                String
+  connectedAccountId    String           @unique
+  accessTokenEncrypted  String?
+  refreshTokenEncrypted String?
+  expiresAt             DateTime?
+  scope                 String?
+  createdAt             DateTime         @default(now())
+  updatedAt             DateTime         @updatedAt
+  user                  User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  connectedAccount      ConnectedAccount @relation(fields: [connectedAccountId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 model SyncCursor {
   id                 String           @id @default(cuid())
+  userId             String
   source             SyncSource
   connectedAccountId String
   cursorType         String
@@ -87,29 +226,16 @@ model SyncCursor {
   metadataJson       String?
   createdAt          DateTime         @default(now())
   updatedAt          DateTime         @updatedAt
+  user               User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   connectedAccount   ConnectedAccount @relation(fields: [connectedAccountId], references: [id], onDelete: Cascade)
 
   @@unique([source, connectedAccountId])
-  @@index([source, updatedAt])
-  @@index([connectedAccountId])
-}
-
-model OAuthToken {
-  id                    String           @id @default(cuid())
-  connectedAccountId    String
-  accessTokenEncrypted  String?
-  refreshTokenEncrypted String?
-  expiryDate            DateTime?
-  scope                 String?
-  createdAt             DateTime         @default(now())
-  updatedAt             DateTime         @updatedAt
-  connectedAccount      ConnectedAccount @relation(fields: [connectedAccountId], references: [id], onDelete: Cascade)
-
-  @@index([connectedAccountId])
+  @@index([userId])
 }
 
 model SyncRun {
   id                 String            @id @default(cuid())
+  userId             String
   source             SyncSource
   status             SyncStatus
   connectedAccountId String?
@@ -119,14 +245,17 @@ model SyncRun {
   inserted           Int               @default(0)
   updated            Int               @default(0)
   error              String?
+  user               User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   connectedAccount   ConnectedAccount? @relation(fields: [connectedAccountId], references: [id], onDelete: SetNull)
   notifications      Notification[]
 
-  @@index([source, startedAt])
+  @@index([userId, source, startedAt])
+  @@index([userId, status])
 }
 
 model Notification {
   id        String             @id @default(cuid())
+  userId    String
   title     String
   body      String
   source    SyncSource
@@ -134,16 +263,21 @@ model Notification {
   status    NotificationStatus @default(UNREAD)
   createdAt DateTime           @default(now())
   readAt    DateTime?
+  user      User               @relation(fields: [userId], references: [id], onDelete: Cascade)
   syncRun   SyncRun?           @relation(fields: [syncRunId], references: [id], onDelete: SetNull)
 
-  @@index([status, createdAt])
-  @@index([source, createdAt])
+  @@index([userId, status, createdAt])
   @@index([syncRunId])
 }
 
+// ---------------------------------------------------------------------------
+// Spending data (optional Gmail ingestion)
+// ---------------------------------------------------------------------------
+
 model EmailSource {
   id             String                 @id @default(cuid())
-  gmailMessageId String                 @unique
+  userId         String
+  gmailMessageId String
   gmailThreadId  String?
   accountEmail   String?
   sentAt         DateTime
@@ -153,18 +287,20 @@ model EmailSource {
   snippet        String?
   labelsJson     String?
   createdAt      DateTime               @default(now())
+  user           User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
   parsed         ParsedFinancialEmail[]
   transactions   Transaction[]
 
-  @@index([sentAt])
-  @@index([accountEmail])
+  @@unique([userId, gmailMessageId])
+  @@index([userId, sentAt])
 }
 
 model ParsedFinancialEmail {
   id                String      @id @default(cuid())
+  userId            String
   emailSourceId     String
   kind              EmailKind
-  amount            Decimal?
+  amount            Decimal?    @db.Decimal(18, 2)
   currency          String      @default("INR")
   merchantName      String?
   paymentInstrument String?
@@ -172,28 +308,35 @@ model ParsedFinancialEmail {
   confidence        Float       @default(0)
   metadataJson      String?
   createdAt         DateTime    @default(now())
+  user              User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   emailSource       EmailSource @relation(fields: [emailSourceId], references: [id], onDelete: Cascade)
 
-  @@index([kind])
+  @@index([userId, kind])
+  @@index([emailSourceId])
 }
 
 model Merchant {
   id             String             @id @default(cuid())
-  name           String             @unique
+  userId         String
+  name           String
   normalizedName String
   category       String?
   createdAt      DateTime           @default(now())
   updatedAt      DateTime           @updatedAt
+  user           User               @relation(fields: [userId], references: [id], onDelete: Cascade)
   transactions   Transaction[]
   recurring      RecurringPayment[]
+
+  @@unique([userId, name])
 }
 
 model Transaction {
   id                String               @id @default(cuid())
+  userId            String
   emailSourceId     String?
   merchantId        String?
-  externalId        String?              @unique
-  amount            Decimal
+  externalId        String
+  amount            Decimal              @db.Decimal(18, 2)
   currency          String               @default("INR")
   transactionDate   DateTime
   direction         TransactionDirection @default(DEBIT)
@@ -203,17 +346,20 @@ model Transaction {
   confidence        Float                @default(0)
   createdAt         DateTime             @default(now())
   updatedAt         DateTime             @updatedAt
+  user              User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
   emailSource       EmailSource?         @relation(fields: [emailSourceId], references: [id], onDelete: SetNull)
   merchant          Merchant?            @relation(fields: [merchantId], references: [id], onDelete: SetNull)
 
-  @@index([transactionDate])
+  @@unique([userId, externalId])
+  @@index([userId, transactionDate])
   @@index([merchantId])
 }
 
 model RecurringPayment {
   id          String          @id @default(cuid())
+  userId      String
   merchantId  String
-  amount      Decimal?
+  amount      Decimal?        @db.Decimal(18, 2)
   currency    String          @default("INR")
   cadence     String          @default("monthly")
   nextDueDate DateTime?
@@ -222,78 +368,141 @@ model RecurringPayment {
   status      RecurringStatus @default(UNKNOWN)
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt
+  user        User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   merchant    Merchant        @relation(fields: [merchantId], references: [id], onDelete: Cascade)
 
   @@unique([merchantId, cadence])
+  @@index([userId, lastSeenAt])
 }
+
+// ---------------------------------------------------------------------------
+// Investment data (Kite)
+// ---------------------------------------------------------------------------
 
 model InvestmentAccount {
-  id          String    @id @default(cuid())
+  id          String     @id @default(cuid())
+  userId      String
   provider    String
+  accountRef  String
   accountName String?
-  accountRef  String?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   holdings    Holding[]
+  positions   Position[]
 
-  @@unique([provider, accountRef])
+  @@unique([userId, provider, accountRef])
 }
 
+// `instrumentKey` is EXCHANGE:SYMBOL for equities and the ISIN for mutual funds.
+// Holdings missing from the latest sync get `closedAt` instead of being deleted,
+// so valuation history survives a sale.
 model Holding {
-  id           String               @id @default(cuid())
-  accountId    String
-  source       String
-  assetClass   AssetClass
-  symbol       String?
-  isin         String?
-  name         String
-  exchange     String?
-  quantity     Decimal              @default(0)
-  averagePrice Decimal?
-  lastPrice    Decimal?
-  currentValue Decimal?
-  pnl          Decimal?
-  pnlPct       Decimal?
-  asOf         DateTime             @default(now())
-  metadataJson String?
-  account      InvestmentAccount    @relation(fields: [accountId], references: [id], onDelete: Cascade)
-  snapshots    InvestmentSnapshot[]
+  id            String               @id @default(cuid())
+  userId        String
+  accountId     String
+  source        String
+  assetClass    AssetClass
+  instrumentKey String
+  symbol        String?
+  isin          String?
+  name          String
+  exchange      String?
+  sector        String?
+  quantity      Decimal              @default(0) @db.Decimal(20, 4)
+  averagePrice  Decimal?             @db.Decimal(20, 4)
+  lastPrice     Decimal?             @db.Decimal(20, 4)
+  closePrice    Decimal?             @db.Decimal(20, 4)
+  currentValue  Decimal?             @db.Decimal(20, 2)
+  pnl           Decimal?             @db.Decimal(20, 2)
+  pnlPct        Decimal?             @db.Decimal(10, 4)
+  dayChange     Decimal?             @db.Decimal(20, 2)
+  asOf          DateTime             @default(now())
+  closedAt      DateTime?
+  user          User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  account       InvestmentAccount    @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  snapshots     InvestmentSnapshot[]
 
-  @@unique([accountId, source, assetClass, name, symbol])
-  @@index([assetClass])
+  @@unique([accountId, assetClass, instrumentKey])
+  @@index([userId, closedAt])
+}
+
+model Position {
+  id           String            @id @default(cuid())
+  userId       String
+  accountId    String
+  symbol       String
+  exchange     String?
+  product      String?
+  quantity     Decimal           @db.Decimal(20, 4)
+  averagePrice Decimal?          @db.Decimal(20, 4)
+  lastPrice    Decimal?          @db.Decimal(20, 4)
+  pnl          Decimal?          @db.Decimal(20, 2)
+  asOf         DateTime          @default(now())
+  user         User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  account      InvestmentAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([accountId])
 }
 
 model InvestmentSnapshot {
-  id           String   @id @default(cuid())
-  holdingId    String
-  source       String
-  capturedAt   DateTime @default(now())
-  quantity     Decimal  @default(0)
-  price        Decimal?
-  value        Decimal?
-  pnl          Decimal?
-  metadataJson String?
-  holding      Holding  @relation(fields: [holdingId], references: [id], onDelete: Cascade)
+  id         String   @id @default(cuid())
+  userId     String
+  holdingId  String
+  source     String
+  capturedAt DateTime @default(now())
+  quantity   Decimal  @default(0) @db.Decimal(20, 4)
+  price      Decimal? @db.Decimal(20, 4)
+  value      Decimal? @db.Decimal(20, 2)
+  pnl        Decimal? @db.Decimal(20, 2)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  holding    Holding  @relation(fields: [holdingId], references: [id], onDelete: Cascade)
 
-  @@index([capturedAt])
+  @@index([userId, capturedAt])
+  @@index([holdingId])
 }
+
+// Shared reference data (not user-owned): ISIN to NSE sector, refreshed by the worker.
+model Security {
+  isin      String   @id
+  symbol    String?
+  name      String
+  sector    String
+  source    String
+  updatedAt DateTime @updatedAt
+
+  @@index([symbol])
+}
+
+// ---------------------------------------------------------------------------
+// Chat
+// ---------------------------------------------------------------------------
 
 model ChatThread {
   id        String        @id @default(cuid())
-  title     String        @default("Finance chat")
+  userId    String
+  title     String        @default("New conversation")
   createdAt DateTime      @default(now())
   updatedAt DateTime      @updatedAt
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   messages  ChatMessage[]
+
+  @@index([userId, updatedAt])
 }
 
 model ChatMessage {
   id           String     @id @default(cuid())
+  userId       String
   threadId     String
   role         String
   content      String
+  model        String?
   metadataJson String?
   createdAt    DateTime   @default(now())
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   thread       ChatThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
 
   @@index([threadId, createdAt])
+  @@index([userId])
 }

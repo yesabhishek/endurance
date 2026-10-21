@@ -1,116 +1,104 @@
 import { google } from "googleapis";
-import { decryptSecret, encryptSecret } from "@/lib/crypto";
-import { getDb } from "@/lib/db";
+import { decrypt, encrypt } from "@/lib/crypto";
+import type { TenantDb } from "@/lib/db";
+import { appUrl, getEnv } from "@/lib/env";
 
 export const GMAIL_SCOPES = [
   "https://www.googleapis.com/auth/userinfo.email",
-  "https://www.googleapis.com/auth/userinfo.profile",
   "https://www.googleapis.com/auth/gmail.readonly",
 ];
 
-export function getGoogleOAuthClient(redirectUri?: string) {
-  const clientId = process.env.GOOGLE_CLIENT_ID;
-  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
-
-  if (!clientId || !clientSecret) {
-    throw new Error("GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET are required.");
-  }
-
-  return new google.auth.OAuth2(
-    clientId,
-    clientSecret,
-    redirectUri ?? process.env.GOOGLE_REDIRECT_URI,
-  );
+export function gmailRedirectUri() {
+  return new URL("/api/gmail/callback", appUrl()).toString();
 }
 
-export function getGoogleAuthUrl(redirectUri: string) {
-  return getGoogleOAuthClient(redirectUri).generateAuthUrl({
+export function getGoogleOAuthClient() {
+  const env = getEnv();
+  if (!env.GOOGLE_CLIENT_ID || !env.GOOGLE_CLIENT_SECRET) {
+    throw new Error("Gmail is not configured. Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in .env.");
+  }
+  return new google.auth.OAuth2(env.GOOGLE_CLIENT_ID, env.GOOGLE_CLIENT_SECRET, gmailRedirectUri());
+}
+
+/** Builds the consent URL with a CSRF state and a PKCE challenge. */
+export async function startGoogleOAuth(state: string) {
+  const client = getGoogleOAuthClient();
+  const { codeVerifier, codeChallenge } = await client.generateCodeVerifierAsync();
+  const url = client.generateAuthUrl({
     access_type: "offline",
-    include_granted_scopes: true,
     prompt: "consent",
     response_type: "code",
     scope: GMAIL_SCOPES,
+    state,
+    code_challenge: codeChallenge,
+    code_challenge_method: "S256" as never,
   });
+  return { url, codeVerifier };
 }
 
-export async function completeGoogleOAuth(code: string, redirectUri: string) {
-  const oauth2 = getGoogleOAuthClient(redirectUri);
-  const { tokens } = await oauth2.getToken(code);
-  oauth2.setCredentials(tokens);
-
-  const oauth2Api = google.oauth2({ auth: oauth2, version: "v2" });
-  const profile = await oauth2Api.userinfo.get();
-  const accountEmail = profile.data.email ?? "gmail";
-
-  const db = getDb();
-  const connectedAccount = await db.connectedAccount.upsert({
-    where: {
-      provider_accountEmail: {
-        provider: "GMAIL",
-        accountEmail,
-      },
-    },
-    update: {
-      displayName: profile.data.name,
-      status: "connected",
-      scope: tokens.scope ?? GMAIL_SCOPES.join(" "),
-    },
-    create: {
-      provider: "GMAIL",
-      accountEmail,
-      displayName: profile.data.name,
-      status: "connected",
-      scope: tokens.scope ?? GMAIL_SCOPES.join(" "),
-    },
-  });
-
-  await db.oAuthToken.create({
-    data: {
-      connectedAccountId: connectedAccount.id,
-      accessTokenEncrypted: encryptSecret(tokens.access_token),
-      refreshTokenEncrypted: encryptSecret(tokens.refresh_token),
-      expiryDate: tokens.expiry_date ? new Date(tokens.expiry_date) : null,
-      scope: tokens.scope ?? GMAIL_SCOPES.join(" "),
-    },
-  });
-
-  return connectedAccount;
+function tokenContext(userId: string, connectedAccountId: string, kind: "access" | "refresh") {
+  return `gmail-${kind}:${userId}:${connectedAccountId}`;
 }
 
-export async function getAuthorizedGmailClient() {
-  const db = getDb();
+export async function completeGoogleOAuth(db: TenantDb, userId: string, code: string, codeVerifier: string) {
+  const client = getGoogleOAuthClient();
+  const { tokens } = await client.getToken({ code, codeVerifier });
+  client.setCredentials(tokens);
+
+  const profile = await google.oauth2({ auth: client, version: "v2" }).userinfo.get();
+  const email = profile.data.email?.toLowerCase();
+  if (!email) throw new Error("Google did not return an email address for this account.");
+
+  const account = await db.connectedAccount.upsert({
+    where: { userId_provider_externalId: { userId, provider: "GMAIL", externalId: email } },
+    update: { displayName: email, status: "CONNECTED", scope: tokens.scope ?? null, connectedAt: new Date() },
+    create: { userId, provider: "GMAIL", externalId: email, displayName: email, status: "CONNECTED", scope: tokens.scope ?? null },
+  });
+
+  const existing = await db.oAuthToken.findUnique({ where: { connectedAccountId: account.id } });
+  const data = {
+    accessTokenEncrypted: tokens.access_token ? encrypt(tokens.access_token, tokenContext(userId, account.id, "access")) : null,
+    // Google only returns a refresh token on first consent; keep the old one otherwise.
+    refreshTokenEncrypted: tokens.refresh_token
+      ? encrypt(tokens.refresh_token, tokenContext(userId, account.id, "refresh"))
+      : existing?.refreshTokenEncrypted ?? null,
+    expiresAt: tokens.expiry_date ? new Date(tokens.expiry_date) : null,
+    scope: tokens.scope ?? null,
+  };
+  await db.oAuthToken.upsert({
+    where: { connectedAccountId: account.id },
+    update: data,
+    create: { userId, connectedAccountId: account.id, ...data },
+  });
+  return account;
+}
+
+export async function getAuthorizedGmailClient(db: TenantDb, userId: string) {
   const account = await db.connectedAccount.findFirst({
-    where: { provider: "GMAIL", status: "connected" },
-    include: { tokens: { orderBy: { createdAt: "desc" }, take: 1 } },
+    where: { userId, provider: "GMAIL", status: "CONNECTED" },
+    include: { token: true },
+    orderBy: { connectedAt: "desc" },
+  });
+  const token = account?.token;
+  if (!account || !token) throw new Error("Spending data is not connected.");
+
+  const client = getGoogleOAuthClient();
+  client.setCredentials({
+    access_token: token.accessTokenEncrypted ? decrypt(token.accessTokenEncrypted, tokenContext(userId, account.id, "access")) : undefined,
+    refresh_token: token.refreshTokenEncrypted ? decrypt(token.refreshTokenEncrypted, tokenContext(userId, account.id, "refresh")) : undefined,
+    expiry_date: token.expiresAt?.getTime(),
   });
 
-  const token = account?.tokens[0];
-  if (!account || !token) {
-    throw new Error("Spending Data is not connected.");
-  }
-
-  const oauth2 = getGoogleOAuthClient();
-  oauth2.setCredentials({
-    access_token: decryptSecret(token.accessTokenEncrypted) ?? undefined,
-    refresh_token: decryptSecret(token.refreshTokenEncrypted) ?? undefined,
-    expiry_date: token.expiryDate?.getTime(),
-    scope: token.scope ?? undefined,
-  });
-
-  oauth2.on("tokens", async (nextTokens) => {
-    await db.oAuthToken.create({
+  client.on("tokens", (next) => {
+    void db.oAuthToken.update({
+      where: { connectedAccountId: account.id },
       data: {
-        connectedAccountId: account.id,
-        accessTokenEncrypted: encryptSecret(nextTokens.access_token),
-        refreshTokenEncrypted: encryptSecret(nextTokens.refresh_token) ?? token.refreshTokenEncrypted,
-        expiryDate: nextTokens.expiry_date ? new Date(nextTokens.expiry_date) : null,
-        scope: nextTokens.scope ?? token.scope,
+        accessTokenEncrypted: next.access_token ? encrypt(next.access_token, tokenContext(userId, account.id, "access")) : undefined,
+        refreshTokenEncrypted: next.refresh_token ? encrypt(next.refresh_token, tokenContext(userId, account.id, "refresh")) : undefined,
+        expiresAt: next.expiry_date ? new Date(next.expiry_date) : undefined,
       },
     });
   });
 
-  return {
-    account,
-    gmail: google.gmail({ auth: oauth2, version: "v1" }),
-  };
+  return { account, gmail: google.gmail({ auth: client, version: "v1" }) };
 }

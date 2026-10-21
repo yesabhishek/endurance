@@ -1,7 +1,12 @@
+# Never send secrets or local data into an image build.
+.env
+.env.*
+!.env.example
+*.db
+*.db-journal
+*.pem
 node_modules
 .next
 coverage
-.env
-*.db
-*.db-journal
 npm-debug.log*
+.git

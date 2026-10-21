@@ -1,46 +1,26 @@
-import { Queue, type ConnectionOptions, type JobsOptions } from "bullmq";
+import { Queue, type JobsOptions } from "bullmq";
 import type { SyncSource } from "@prisma/client";
+import { redisOptions } from "@/lib/redis";
 
 export const SYNC_QUEUE_NAME = "endurance-sync";
 
+// Jobs carry ids only. Secrets and tokens are read from the database by the worker.
 export type SyncJobData = {
+  userId: string;
   source: SyncSource;
   syncRunId: string;
 };
 
 const defaultJobOptions: JobsOptions = {
   attempts: 2,
-  backoff: {
-    type: "exponential",
-    delay: 5_000,
-  },
-  removeOnComplete: {
-    age: 60 * 60,
-    count: 50,
-  },
-  removeOnFail: {
-    age: 24 * 60 * 60,
-    count: 100,
-  },
+  backoff: { type: "exponential", delay: 5_000 },
+  removeOnComplete: { age: 60 * 60, count: 500 },
+  removeOnFail: { age: 24 * 60 * 60, count: 1000 },
 };
 
-export function getRedisConnection(): ConnectionOptions {
-  const redisUrl = new URL(process.env.REDIS_URL ?? "redis://localhost:6379");
+let queue: Queue<SyncJobData> | null = null;
 
-  return {
-    host: redisUrl.hostname,
-    port: Number(redisUrl.port || 6379),
-    username: redisUrl.username || undefined,
-    password: redisUrl.password || undefined,
-    db: redisUrl.pathname && redisUrl.pathname !== "/" ? Number(redisUrl.pathname.slice(1)) : undefined,
-    tls: redisUrl.protocol === "rediss:" ? {} : undefined,
-    maxRetriesPerRequest: null,
-  };
-}
-
-export function createSyncQueue() {
-  return new Queue<SyncJobData>(SYNC_QUEUE_NAME, {
-    connection: getRedisConnection(),
-    defaultJobOptions,
-  });
+export function getSyncQueue() {
+  queue ??= new Queue<SyncJobData>(SYNC_QUEUE_NAME, { connection: redisOptions(), defaultJobOptions });
+  return queue;
 }

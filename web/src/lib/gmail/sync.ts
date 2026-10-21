@@ -1,7 +1,7 @@
 import type { ConnectedAccount, SyncCursor } from "@prisma/client";
 import { format, subDays, subMonths } from "date-fns";
-import { getDb } from "@/lib/db";
-import type { DbClient } from "@/lib/db";
+import { tenantDb, type TenantDb } from "@/lib/db";
+import { getEnv } from "@/lib/env";
 import { parseFinancialEmail } from "@/lib/finance/email-parser";
 import { getAuthorizedGmailClient } from "./auth";
 
@@ -29,7 +29,8 @@ type GmailHeader = {
 };
 
 type GmailSyncOptions = {
-  syncRunId?: string;
+  userId: string;
+  syncRunId: string;
   limit?: number;
   months?: number;
 };
@@ -55,24 +56,17 @@ type GmailSyncPlan = {
 
 const GMAIL_CURSOR_OVERLAP_DAYS = 2;
 
-export async function syncGmailFinancialEmails(options: GmailSyncOptions = {}) {
-  const db = getDb();
+export async function syncGmailFinancialEmails(options: GmailSyncOptions) {
+  const { userId } = options;
+  const db = tenantDb(userId);
   const config = getSpendingSyncConfig(options);
-  const syncRun = options.syncRunId
-    ? await db.syncRun.update({
-        where: { id: options.syncRunId },
-        data: {
-          status: "RUNNING",
-          finishedAt: null,
-          error: null,
-        },
-      })
-    : await db.syncRun.create({
-        data: { source: "GMAIL", status: "RUNNING" },
-      });
+  const syncRun = await db.syncRun.update({
+    where: { id: options.syncRunId },
+    data: { status: "RUNNING", finishedAt: null, error: null },
+  });
 
   try {
-    const { account, gmail } = await getAuthorizedGmailClient();
+    const { account, gmail } = await getAuthorizedGmailClient(db, userId);
     await db.syncRun.update({
       where: { id: syncRun.id },
       data: { connectedAccountId: account.id },
@@ -87,7 +81,7 @@ export async function syncGmailFinancialEmails(options: GmailSyncOptions = {}) {
 
     for (const [index, message] of messages.entries()) {
       if (!message.id) continue;
-      const result = await processGmailMessage(db, gmail, account, message.id);
+      const result = await processGmailMessage(db, userId, gmail, account, message.id);
       processed.push(result);
       inserted += 1;
 
@@ -103,7 +97,7 @@ export async function syncGmailFinancialEmails(options: GmailSyncOptions = {}) {
       }
     }
 
-    await updateGmailSyncCursor(db, account, plan, processed);
+    await updateGmailSyncCursor(db, userId, account, plan, processed);
 
     return await db.syncRun.update({
       where: { id: syncRun.id },
@@ -121,15 +115,16 @@ export async function syncGmailFinancialEmails(options: GmailSyncOptions = {}) {
       data: {
         status: "FAILED",
         finishedAt: new Date(),
-        error: error instanceof Error ? error.message : "Unknown Spending Data update error",
+        error: "Spending data could not be updated. Reconnect Gmail in Settings and try again.",
       },
     });
-    throw new Error(failedRun.error ?? "Unknown Spending Data update error");
+    console.error("[gmail-sync] failed", error);
+    throw new Error(failedRun.error ?? "Spending data could not be updated.");
   }
 }
 
 async function buildGmailSyncPlan(
-  db: DbClient,
+  db: TenantDb,
   gmail: GmailClient,
   account: ConnectedAccount,
   config: ReturnType<typeof getSpendingSyncConfig>,
@@ -229,7 +224,7 @@ async function listGmailHistoryMessageRefs(gmail: GmailClient, startHistoryId: s
   };
 }
 
-async function filterNewGmailMessageRefs(db: DbClient, refs: GmailMessageRef[]) {
+async function filterNewGmailMessageRefs(db: TenantDb, refs: GmailMessageRef[]) {
   const uniqueRefs = dedupeMessageRefs(refs);
   const ids = uniqueRefs.map((message) => message.id).filter((id): id is string => Boolean(id));
   if (!ids.length) return [];
@@ -243,7 +238,8 @@ async function filterNewGmailMessageRefs(db: DbClient, refs: GmailMessageRef[]) 
 }
 
 async function processGmailMessage(
-  db: DbClient,
+  db: TenantDb,
+  userId: string,
   gmail: GmailClient,
   account: ConnectedAccount,
   messageId: string,
@@ -267,10 +263,10 @@ async function processGmailMessage(
   });
 
   const emailSource = await db.emailSource.upsert({
-    where: { gmailMessageId: messageId },
+    where: { userId_gmailMessageId: { userId, gmailMessageId: messageId } },
     update: {
       gmailThreadId: detail.data.threadId,
-      accountEmail: account.accountEmail,
+      accountEmail: account.externalId,
       sentAt,
       fromAddress: from,
       subject,
@@ -278,9 +274,10 @@ async function processGmailMessage(
       labelsJson: JSON.stringify(detail.data.labelIds ?? []),
     },
     create: {
+      userId,
       gmailMessageId: messageId,
       gmailThreadId: detail.data.threadId,
-      accountEmail: account.accountEmail,
+      accountEmail: account.externalId,
       sentAt,
       fromAddress: from,
       subject,
@@ -295,6 +292,7 @@ async function processGmailMessage(
     });
     await db.parsedFinancialEmail.create({
       data: {
+        userId,
         emailSourceId: emailSource.id,
         kind: parsed.kind,
         amount: parsed.amount,
@@ -309,12 +307,13 @@ async function processGmailMessage(
 
     if (parsed.amount && parsed.amount > 0 && isParsedExpense(parsed.kind, parsed.category)) {
       const merchant = await db.merchant.upsert({
-        where: { name: parsed.merchantName ?? "Unknown merchant" },
+        where: { userId_name: { userId, name: parsed.merchantName ?? "Unknown merchant" } },
         update: {
           normalizedName: normalizeMerchant(parsed.merchantName),
           category: parsed.category,
         },
         create: {
+          userId,
           name: parsed.merchantName ?? "Unknown merchant",
           normalizedName: normalizeMerchant(parsed.merchantName),
           category: parsed.category,
@@ -322,7 +321,7 @@ async function processGmailMessage(
       });
 
       await db.transaction.upsert({
-        where: { externalId: `${messageId}:${parsed.amount}` },
+        where: { userId_externalId: { userId, externalId: `${messageId}:${parsed.amount}` } },
         update: {
           emailSourceId: emailSource.id,
           merchantId: merchant.id,
@@ -334,6 +333,7 @@ async function processGmailMessage(
           confidence: parsed.confidence,
         },
         create: {
+          userId,
           externalId: `${messageId}:${parsed.amount}`,
           emailSourceId: emailSource.id,
           merchantId: merchant.id,
@@ -360,6 +360,7 @@ async function processGmailMessage(
             status: "ACTIVE",
           },
           create: {
+            userId,
             merchantId: merchant.id,
             amount: parsed.amount,
             cadence: "monthly",
@@ -379,7 +380,8 @@ async function processGmailMessage(
 }
 
 async function updateGmailSyncCursor(
-  db: DbClient,
+  db: TenantDb,
+  userId: string,
   account: ConnectedAccount,
   plan: GmailSyncPlan,
   processed: ProcessedGmailMessage[],
@@ -413,6 +415,7 @@ async function updateGmailSyncCursor(
       }),
     },
     create: {
+      userId,
       source: "GMAIL",
       connectedAccountId: account.id,
       cursorType: plan.cursorType,
@@ -480,10 +483,11 @@ function isParsedExpense(kind: string, category: string | null) {
   return category !== "Investments" && category !== "Gold";
 }
 
-export function getSpendingSyncConfig(options: GmailSyncOptions = {}) {
+export function getSpendingSyncConfig(options: Pick<GmailSyncOptions, "limit" | "months"> = {}) {
+  const env = getEnv();
   return {
-    months: positiveInteger(options.months ?? process.env.GMAIL_SYNC_MONTHS, 48),
-    limit: positiveInteger(options.limit ?? process.env.GMAIL_SYNC_LIMIT, 500),
+    months: positiveInteger(options.months ?? env.GMAIL_SYNC_MONTHS, 48),
+    limit: positiveInteger(options.limit ?? env.GMAIL_SYNC_LIMIT, 500),
   };
 }
 

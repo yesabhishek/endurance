@@ -1,40 +1,29 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Inter } from "next/font/google";
+import { headers } from "next/headers";
+import { ThemeProvider } from "next-themes";
 import { Toaster } from "@/components/ui/sonner";
-import { AppNav } from "@/components/app/app-nav";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+const inter = Inter({ variable: "--font-inter", subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Endurance",
-  description: "Private local finance intelligence workspace",
+  title: { default: "Endurance", template: "%s · Endurance" },
+  description: "Analytics, risk and a 20-year outlook for your Zerodha portfolio, with an analyst you can ask anything.",
+  robots: { index: false, follow: false },
 };
 
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+  // Reading the nonce makes every page render per request, which strict CSP needs.
+  const nonce = (await headers()).get("x-nonce") ?? undefined;
+
   return (
-    <html
-      lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full`}
-    >
-      <body className="flex min-h-full flex-col antialiased">
-        <AppNav />
-        <main className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6 px-4 py-6">
+    <html lang="en-IN" className={`${inter.variable} h-full`} suppressHydrationWarning>
+      <body className="min-h-full antialiased">
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange nonce={nonce}>
           {children}
-        </main>
-        <Toaster />
+          <Toaster />
+        </ThemeProvider>
       </body>
     </html>
   );

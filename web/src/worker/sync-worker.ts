@@ -1,27 +1,28 @@
 import { Worker } from "bullmq";
+import { getEnv } from "@/lib/env";
+import { redisOptions } from "@/lib/redis";
+import { ensureSecurityMaster } from "@/lib/securities";
 import { processSyncJob } from "@/lib/sync/worker";
-import { getRedisConnection, SYNC_QUEUE_NAME, type SyncJobData } from "@/lib/sync/queue";
+import { SYNC_QUEUE_NAME, type SyncJobData } from "@/lib/sync/queue";
 
-const concurrency = Number(process.env.SYNC_WORKER_CONCURRENCY ?? 1);
+// Fail fast with a readable message when configuration is missing.
+getEnv();
+
+const concurrency = Math.max(1, Number(process.env.SYNC_WORKER_CONCURRENCY ?? 2));
 
 const worker = new Worker<SyncJobData>(SYNC_QUEUE_NAME, processSyncJob, {
-  connection: getRedisConnection(),
+  connection: redisOptions(),
   concurrency,
 });
 
-worker.on("completed", (job) => {
-  console.log(`Sync job completed: ${job.id}`);
-});
+worker.on("completed", (job) => console.log(`[worker] job ${job.id} completed`));
+worker.on("failed", (job, error) => console.error(`[worker] job ${job?.id ?? "unknown"} failed: ${error.message}`));
+worker.on("error", (error) => console.error("[worker] error", error.message));
 
-worker.on("failed", (job, error) => {
-  console.error(`Sync job failed: ${job?.id ?? "unknown"}`, error);
-});
+console.log(`[worker] listening on ${SYNC_QUEUE_NAME} with concurrency ${concurrency}`);
 
-worker.on("error", (error) => {
-  console.error("Sync worker error", error);
-});
-
-console.log(`Sync worker listening on ${SYNC_QUEUE_NAME} with concurrency ${concurrency}`);
+// Warm the sector table so the first portfolio sync doesn't wait on it.
+void ensureSecurityMaster();
 
 async function shutdown() {
   await worker.close();

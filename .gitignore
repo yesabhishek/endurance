@@ -1,74 +1,61 @@
-# Dependencies
-node_modules/
-__pycache__/
-*.py[cod]
-*$py.class
-.Python
-pip-log.txt
-pip-delete-this-directory.txt
-
-# Virtual environments
-venv/
-ENV/
-.venv/
-env/
-
-# Environment files (CRITICAL: Never commit secrets)
+# Secrets: never commit real credentials. Only *.example templates are tracked.
 .env
-.env.local
-.env.*.local
+.env.*
+!.env.example
 *.env
+!*.env.example
+*.pem
+*.key
+*.p12
+secrets/
 
-# IDE
-.idea/
-.vscode/
-*.swp
-*.swo
-*~
+# Local data: databases, dumps, uploads
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+*.dump
+*.sql.gz
+pgdata/
+/data/
+web/data/
 
-# OS files
-.DS_Store
-Thumbs.db
+# Dependencies and build output
+node_modules/
+.next/
+out/
+build/
+dist/
+coverage/
+*.tsbuildinfo
+next-env.d.ts
 
-# Django
-*.log
-local_settings.py
-db.sqlite3
-staticfiles/
-media/
-
-# Docker
-*.log
-
-# Go
+# Go build output from the legacy kite-mcp folder
 kite-mcp/kite-mcp-server
 
 # Kite session data
 *.session
 access_token*
 
-# Compiled files
-*.exe
-*.dll
-*.so
-*.dylib
+# Logs
+*.log
+npm-debug.log*
 
-# Test coverage
-htmlcov/
-.tox/
-.coverage
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*.cover
-.hypothesis/
-.pytest_cache/
+# Python leftovers from the old Django app
+__pycache__/
+*.py[cod]
+venv/
+.venv/
 
-# Jupyter
-.ipynb_checkpoints
+# OS and editor files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*~
 
-# Distribution
-build/
-dist/
-*.egg-info/
+# Tool state
+.gstack/

@@ -1,101 +1,73 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createSyncNotification, listNotifications, markNotificationsRead } from "./notifications";
+import type { TenantDb } from "@/lib/db";
+import { createSyncNotification, describeSyncRun, listNotifications, markNotificationsRead } from "./notifications";
 
 const mocks = vi.hoisted(() => ({
   db: {
-      notification: {
-        create: vi.fn(),
-        findMany: vi.fn(),
-        count: vi.fn(),
-        update: vi.fn(),
-        updateMany: vi.fn(),
-      },
-      syncRun: {
-        findMany: vi.fn(),
-      },
+    notification: {
+      create: vi.fn(),
+      findMany: vi.fn(),
+      count: vi.fn(),
+      updateMany: vi.fn(),
+    },
+    syncRun: { findMany: vi.fn() },
   },
+  tenantUserIds: [] as string[],
 }));
 
 vi.mock("@/lib/db", () => ({
-  getDb: () => mocks.db,
+  tenantDb: (userId: string) => {
+    mocks.tenantUserIds.push(userId);
+    return mocks.db;
+  },
 }));
+
+const db = mocks.db as unknown as TenantDb;
 
 describe("notifications", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.tenantUserIds.length = 0;
   });
 
-  it("creates a success notification for a sync run", async () => {
-    mocks.db.notification.create.mockResolvedValue({ id: "notification-1" });
+  it("writes a success notification through the user's scoped client", async () => {
+    mocks.db.notification.create.mockResolvedValue({ id: "n-1" });
 
-    await createSyncNotification({
-      id: "sync-1",
-      source: "GMAIL",
-      status: "SUCCESS",
-      scanned: 10,
-      inserted: 3,
-      updated: 7,
-      error: null,
-    });
+    await createSyncNotification("user-1", { id: "sync-1", source: "KITE", status: "SUCCESS", scanned: 10, inserted: 3, updated: 7, error: null });
 
+    expect(mocks.tenantUserIds).toEqual(["user-1"]);
     expect(mocks.db.notification.create).toHaveBeenCalledWith({
       data: {
-        title: "Spending Data update completed",
-        body: "Scanned 10, inserted 3, updated 7.",
-        source: "GMAIL",
+        userId: "user-1",
+        title: "Portfolio updated",
+        body: "Checked 10 items: 3 new, 7 refreshed.",
+        source: "KITE",
         syncRunId: "sync-1",
         status: "UNREAD",
       },
     });
   });
 
-  it("creates a failure notification for a sync run", async () => {
-    mocks.db.notification.create.mockResolvedValue({ id: "notification-2" });
-
-    await createSyncNotification({
-      id: "sync-2",
-      source: "KITE",
-      status: "FAILED",
-      scanned: 0,
-      inserted: 0,
-      updated: 0,
-      error: "Investment connector login required",
-    });
-
-    expect(mocks.db.notification.create).toHaveBeenCalledWith({
-      data: expect.objectContaining({
-        title: "Investment Data update failed",
-        body: "Investment Data could not be updated. Open Settings and reconnect this data source if needed.",
-        source: "KITE",
-      }),
-    });
+  it("shows the run's own error text on failure", () => {
+    const text = describeSyncRun({ id: "s", source: "KITE", status: "FAILED", scanned: 0, inserted: 0, updated: 0, error: "Your Kite session has expired." });
+    expect(text).toEqual({ title: "Portfolio update failed", body: "Your Kite session has expired." });
   });
 
-  it("lists notifications with unread count", async () => {
-    mocks.db.notification.findMany.mockResolvedValue([{ id: "notification-1" }]);
+  it("lists notifications with the unread count and active syncs", async () => {
+    mocks.db.notification.findMany.mockResolvedValue([{ id: "n-1" }]);
     mocks.db.notification.count.mockResolvedValue(1);
-    mocks.db.syncRun.findMany.mockResolvedValue([{ id: "sync-1", status: "RUNNING" }]);
+    mocks.db.syncRun.findMany.mockResolvedValue([]);
 
-    await expect(listNotifications()).resolves.toEqual({
-      notifications: [{ id: "notification-1" }],
-      unreadCount: 1,
-      activeSyncs: [{ id: "sync-1", status: "RUNNING" }],
-    });
+    await expect(listNotifications(db)).resolves.toEqual({ notifications: [{ id: "n-1" }], unreadCount: 1, activeSyncs: [] });
   });
 
-  it("marks all unread notifications as read", async () => {
-    mocks.db.notification.updateMany.mockResolvedValue({ count: 2 });
+  it("marks one notification read with updateMany, so a foreign id matches nothing", async () => {
     mocks.db.notification.findMany.mockResolvedValue([]);
     mocks.db.notification.count.mockResolvedValue(0);
+    mocks.db.syncRun.findMany.mockResolvedValue([]);
 
-    await markNotificationsRead({ all: true });
+    await markNotificationsRead(db, { id: "n-9" });
 
-    expect(mocks.db.notification.updateMany).toHaveBeenCalledWith({
-      where: { status: "UNREAD" },
-      data: expect.objectContaining({
-        status: "READ",
-        readAt: expect.any(Date),
-      }),
-    });
+    expect(mocks.db.notification.updateMany).toHaveBeenCalledWith({ where: { id: "n-9" }, data: expect.objectContaining({ status: "READ" }) });
   });
 });

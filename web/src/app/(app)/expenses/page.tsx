@@ -6,6 +6,7 @@ import { EmptyState } from "@/components/data/empty-state";
 import { ExpenseAnalytics, ExpenseRangeControls } from "@/components/data/expense-analytics";
 import { StatGrid } from "@/components/data/stat-grid";
 import { TransactionTable } from "@/components/data/transaction-table";
+import { requireUserDb } from "@/lib/auth/guard";
 import { getExpensesData } from "@/lib/finance/repositories";
 import { currency } from "@/lib/format";
 
@@ -17,13 +18,13 @@ type ExpensesPageProps = {
 
 export default async function ExpensesPage({ searchParams }: ExpensesPageProps) {
   const params = await searchParams;
-  const data = await getExpensesData(params ?? {});
+  const { db } = await requireUserDb();
+  const data = await getExpensesData(db, params ?? {});
 
   return (
     <>
       <PageHeader
-        eyebrow="Expenses"
-        title="Expense ledger"
+        title="Spending"
         description="Track spend, recurring bills, and merchant patterns across the selected date range."
         action={<ExpenseRangeControls range={data.range} />}
       />
