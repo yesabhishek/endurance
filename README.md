@@ -29,8 +29,10 @@ You need [Docker](https://docs.docker.com/get-docker/) and a Zerodha account.
 git clone https://github.com/yesabhishek/endurance.git
 cd endurance
 ./scripts/setup.sh          # writes .env with random secrets
-docker compose up --build
+docker compose up           # pulls the released images and starts everything
 ```
+
+`docker compose up` uses the prebuilt images from [GitHub Container Registry](https://github.com/yesabhishek?tab=packages&repo_name=endurance) (`endurance-web`, `endurance-worker`, `endurance-migrate`, for Intel and ARM). To pin a version, set `ENDURANCE_VERSION=0.1.0` in `.env`. To run exactly the code you checked out, use `docker compose up --build`. To update later: `git pull && docker compose pull && docker compose up -d` (migrations run automatically).
 
 Open **http://localhost:3000**, create your account, then go to **Settings**:
 
@@ -45,9 +47,9 @@ Your portfolio syncs right after login. Kite ends every session early each morni
 
 | Page | What it shows |
 | --- | --- |
-| Overview | Value, today's change, unrealised P&L, sectors held, sector bars against your limit, largest holdings, breaches of your limits |
+| Dashboard | Current value and day's P&L, value against investment over time, holdings heatmap, risk zones, risk map, allocation by asset class and sector, 20-year outlook with an AI forecast toggle, today's movers, largest holdings |
 | Holdings | Every holding with sector and weight, concentration, value over time, open positions |
-| Ask | Chat with source chips showing which data each answer used |
+| Ask | Full-page chat with history. The same assistant is docked beside every page (⌘K), with source chips showing which data each answer used |
 | Spending | Optional: expenses, subscriptions and cards parsed from Gmail (read-only) |
 | Settings | Kite app and login, AI keys and model, your limits, Gmail, data reset |
 

@@ -1,7 +1,10 @@
 # Endurance: self-hosted portfolio dashboard for Zerodha Kite.
 #
 #   ./scripts/setup.sh        # once: writes .env with random secrets
-#   docker compose up --build # then open http://localhost:3000
+#   docker compose up         # then open http://localhost:3000
+#
+# `up` pulls the released images from ghcr.io (set ENDURANCE_VERSION in .env to
+# pin one, default latest). `docker compose up --build` builds this checkout instead.
 #
 # Only the web app is published, and only on 127.0.0.1. Postgres and Redis are
 # reachable from inside this compose network only. To use Endurance from other
@@ -64,6 +67,7 @@ services:
       REDIS_PASSWORD: ${REDIS_PASSWORD}
 
   migrate:
+    image: ghcr.io/yesabhishek/endurance-migrate:${ENDURANCE_VERSION:-latest}
     build:
       context: ./web
       target: migrate
@@ -74,6 +78,7 @@ services:
     restart: "no"
 
   web:
+    image: ghcr.io/yesabhishek/endurance-web:${ENDURANCE_VERSION:-latest}
     build:
       context: ./web
       target: runner
@@ -88,6 +93,7 @@ services:
         condition: service_healthy
 
   worker:
+    image: ghcr.io/yesabhishek/endurance-worker:${ENDURANCE_VERSION:-latest}
     build:
       context: ./web
       target: worker
