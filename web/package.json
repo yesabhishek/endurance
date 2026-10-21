@@ -22,7 +22,7 @@
     "@ai-sdk/anthropic": "3.0.127",
     "@ai-sdk/google": "3.0.130",
     "@ai-sdk/openai": "3.0.124",
-    "@ai-sdk/react": "3.0.304",
+    "@ai-sdk/react": "4.0.147",
     "@prisma/client": "^6.19.3",
     "ai": "6.0.301",
     "bullmq": "^5.76.4",
