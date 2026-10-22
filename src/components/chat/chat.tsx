@@ -2,7 +2,7 @@
 
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, getToolName, isToolUIPart } from "ai";
-import { AlertTriangle, ArrowDownRight, BarChart3, Check, Gauge, Layers, Loader2, Newspaper, ShieldAlert, TrendingDown, X } from "lucide-react";
+import { AlertTriangle, ArrowDownRight, BarChart3, Check, Database, Gauge, Layers, Loader2, Newspaper, ShieldAlert, TrendingDown, X } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { TOOL_TITLES } from "@/lib/ai/tool-titles";
@@ -121,10 +121,28 @@ export function Chat({ id, initialMessages, ai, home }: ChatProps) {
     if (element) pinned.current = element.scrollHeight - element.scrollTop - element.clientHeight < 80;
   }
 
+  // The sources panel stays closed until a citation or the Sources button asks for it.
   function selectSource(ref: string | null) {
     setSelected(ref);
     if (ref) setPanelOpen(true);
   }
+
+  function closePanel() {
+    setPanelOpen(false);
+    setSelected(null);
+  }
+
+  useEffect(() => {
+    if (!panelOpen) return;
+    function onKey(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setPanelOpen(false);
+        setSelected(null);
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [panelOpen]);
 
   const composerFooter = ai.ready ? (
     <span>
@@ -197,8 +215,23 @@ export function Chat({ id, initialMessages, ai, home }: ChatProps) {
   return (
     <div className="flex h-full min-h-0">
       <div className="flex min-w-0 flex-1 flex-col">
+        {/* Its own row, so the button never sits on top of the answer as it scrolls. */}
+        {sourceList.length ? (
+          <div className="flex h-11 shrink-0 items-center justify-end px-4">
+            {panelOpen ? null : (
+              <button
+                type="button"
+                onClick={() => setPanelOpen(true)}
+                className="inline-flex h-8 items-center gap-1.5 rounded-md border bg-card px-2.5 text-xs font-medium text-muted-foreground transition-colors hover:border-foreground/40 hover:text-foreground"
+              >
+                <Database className="size-3.5" aria-hidden /> Sources
+                <span className="tabular-nums">{sourceList.length}</span>
+              </button>
+            )}
+          </div>
+        ) : null}
         <div ref={scroller} onScroll={onScroll} className="flex-1 overflow-y-auto">
-          <div className="mx-auto flex w-full max-w-3xl flex-col gap-9 px-5 pt-10 pb-6">
+          <div className={cn("mx-auto flex w-full max-w-3xl flex-col gap-9 px-5 pb-6", sourceList.length ? "pt-4" : "pt-10")}>
             {messages.map((message, index) => (
               <MessageView
                 key={message.id}
@@ -239,18 +272,16 @@ export function Chat({ id, initialMessages, ai, home }: ChatProps) {
         </div>
       </div>
 
-      {sourceList.length ? (
+      {sourceList.length && panelOpen ? (
         <>
           <aside aria-label="Sources" className="hidden w-[380px] shrink-0 border-l bg-card xl:block">
-            <SourcesPanel sources={sourceList} selected={selected} onSelect={setSelected} />
+            <SourcesPanel sources={sourceList} selected={selected} onSelect={setSelected} onClose={closePanel} />
           </aside>
-          {panelOpen ? (
-            <div className="fixed inset-0 z-40 flex justify-end bg-black/30 xl:hidden" onClick={() => setPanelOpen(false)}>
-              <div className="h-full w-[min(420px,92vw)] bg-card shadow-xl" onClick={(event) => event.stopPropagation()}>
-                <SourcesPanel sources={sourceList} selected={selected} onSelect={setSelected} onClose={() => setPanelOpen(false)} />
-              </div>
+          <div className="fixed inset-0 z-40 flex justify-end bg-black/30 xl:hidden" onClick={closePanel}>
+            <div className="h-full w-[min(420px,92vw)] bg-card shadow-xl" onClick={(event) => event.stopPropagation()}>
+              <SourcesPanel sources={sourceList} selected={selected} onSelect={setSelected} onClose={closePanel} />
             </div>
-          ) : null}
+          </div>
         </>
       ) : null}
     </div>

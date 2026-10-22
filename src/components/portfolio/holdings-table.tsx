@@ -119,14 +119,14 @@ export function HoldingsTable({ rows }: { rows: HoldingRow[] }) {
                   </div>
                   <div className="truncate text-xs text-muted-foreground">{row.sector}</div>
                 </td>
-                <td className="hidden px-3 text-right tabular-nums md:table-cell">{qty.format(row.quantity)}</td>
-                <td className="hidden px-3 text-right tabular-nums lg:table-cell">{row.averagePrice === null ? "—" : price.format(row.averagePrice)}</td>
-                <td className="hidden px-3 text-right tabular-nums lg:table-cell">{row.lastPrice === null ? "—" : price.format(row.lastPrice)}</td>
-                <td className="px-3 text-right tabular-nums">{inr(row.value)}</td>
-                <td className="hidden px-3 text-right text-muted-foreground tabular-nums sm:table-cell">{pct(row.weightPct)}</td>
-                <td className={cn("px-3 text-right tabular-nums", row.pnl >= 0 ? "text-gain" : "text-loss")}>{inr(row.pnl, { signed: true })}</td>
-                <td className={cn("hidden px-3 text-right tabular-nums md:table-cell", (row.pnlPct ?? 0) >= 0 ? "text-gain" : "text-loss")}>{row.pnlPct === null ? "—" : pct(row.pnlPct, { signed: true, digits: 2 })}</td>
-                <td className={cn("hidden pr-5 pl-3 text-right tabular-nums md:table-cell md:pr-6", row.dayPct === null ? "text-faint" : row.dayPct >= 0 ? "text-gain" : "text-loss")}>
+                <td className="sensitive hidden px-3 text-right tabular-nums md:table-cell">{qty.format(row.quantity)}</td>
+                <td className="sensitive hidden px-3 text-right tabular-nums lg:table-cell">{row.averagePrice === null ? "—" : price.format(row.averagePrice)}</td>
+                <td className="sensitive hidden px-3 text-right tabular-nums lg:table-cell">{row.lastPrice === null ? "—" : price.format(row.lastPrice)}</td>
+                <td className="sensitive px-3 text-right tabular-nums">{inr(row.value)}</td>
+                <td className="sensitive hidden px-3 text-right text-muted-foreground tabular-nums sm:table-cell">{pct(row.weightPct)}</td>
+                <td className={cn("sensitive px-3 text-right tabular-nums", row.pnl >= 0 ? "text-gain" : "text-loss")}>{inr(row.pnl, { signed: true })}</td>
+                <td className={cn("sensitive hidden px-3 text-right tabular-nums md:table-cell", (row.pnlPct ?? 0) >= 0 ? "text-gain" : "text-loss")}>{row.pnlPct === null ? "—" : pct(row.pnlPct, { signed: true, digits: 2 })}</td>
+                <td className={cn("sensitive hidden pr-5 pl-3 text-right tabular-nums md:table-cell md:pr-6", row.dayPct === null ? "text-faint" : row.dayPct >= 0 ? "text-gain" : "text-loss")}>
                   {row.dayPct === null ? "—" : pct(row.dayPct, { signed: true, digits: 2 })}
                 </td>
               </tr>

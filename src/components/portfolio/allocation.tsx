@@ -1,5 +1,5 @@
 import type { Slice } from "@/lib/portfolio";
-import { inrCompact, inrShort, pct } from "@/lib/format";
+import { inrCompact, pct } from "@/lib/format";
 
 // Colour follows the asset class, never its rank, so filters and new syncs don't repaint it.
 const CLASS_COLOR: Record<string, string> = {
@@ -18,7 +18,7 @@ export function AssetClassBar({ slices }: { slices: Slice[] }) {
         {slices.map((slice, index) => (
           <span
             key={slice.label}
-            title={`${slice.label}: ${pct(slice.pct)}, ${inrShort(slice.value)}`}
+            title={slice.label}
             className={index === 0 ? "rounded-l" : index === slices.length - 1 ? "rounded-r" : undefined}
             style={{ width: `${slice.pct}%`, minWidth: 3, background: CLASS_COLOR[slice.label] ?? "var(--faint)" }}
           />
@@ -30,7 +30,7 @@ export function AssetClassBar({ slices }: { slices: Slice[] }) {
             <span aria-hidden className="mt-1 size-2.5 shrink-0 rounded-[2px]" style={{ background: CLASS_COLOR[slice.label] ?? "var(--faint)" }} />
             <span className="flex min-w-0 flex-col">
               <span className="truncate text-muted-foreground">{slice.label}</span>
-              <span className="font-semibold whitespace-nowrap tabular-nums">
+              <span className="sensitive font-semibold whitespace-nowrap tabular-nums">
                 {pct(slice.pct)} <span className="font-normal text-muted-foreground">{inrCompact(slice.value)}</span>
               </span>
             </span>

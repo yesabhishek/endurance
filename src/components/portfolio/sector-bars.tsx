@@ -1,5 +1,5 @@
 import type { Slice } from "@/lib/portfolio";
-import { inrShort, pct } from "@/lib/format";
+import { pct } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 type SectorBarsProps = {
@@ -22,7 +22,7 @@ export function SectorBars({ slices, limitPct, emptyText }: SectorBarsProps) {
           const over = limitPct !== undefined && slice.label !== "Unclassified" && slice.pct > limitPct;
           return (
             <li key={slice.label} className="grid grid-cols-[minmax(0,1fr)_3.5rem] items-center gap-x-3 gap-y-1 text-[0.8125rem] @sm:grid-cols-[minmax(0,11rem)_minmax(0,1fr)_3.5rem]">
-              <span className="col-span-2 truncate @sm:col-span-1" title={`${slice.label}: ${inrShort(slice.value)} across ${slice.count} holding${slice.count === 1 ? "" : "s"}`}>
+              <span className="col-span-2 truncate @sm:col-span-1" title={`${slice.label}: ${slice.count} holding${slice.count === 1 ? "" : "s"}`}>
                 {slice.label}
               </span>
               <span className="relative h-2.5 rounded-r-[4px] bg-muted" aria-hidden>
@@ -31,7 +31,7 @@ export function SectorBars({ slices, limitPct, emptyText }: SectorBarsProps) {
                   <span className="absolute -inset-y-1 border-l border-dashed border-muted-foreground" style={{ left: `${(limitPct / scale) * 100}%` }} />
                 ) : null}
               </span>
-              <span className={cn("text-right tabular-nums", over ? "font-semibold text-loss" : "text-muted-foreground")}>
+              <span className={cn("sensitive text-right tabular-nums", over ? "font-semibold text-loss" : "text-muted-foreground")}>
                 {pct(slice.pct)}
                 {over ? <span className="sr-only"> (over your limit)</span> : null}
               </span>

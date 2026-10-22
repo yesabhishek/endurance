@@ -26,7 +26,7 @@ export function TooltipRow({ color, label, value, tone }: { color?: string; labe
   return (
     <div className="flex items-center gap-2 py-0.5">
       {color ? <span aria-hidden className="h-0.5 w-3 shrink-0 rounded-full" style={{ background: color }} /> : null}
-      <span className={cn("font-semibold tabular-nums", tone === "gain" && "text-gain", tone === "loss" && "text-loss")}>{value}</span>
+      <span className={cn("sensitive font-semibold tabular-nums", tone === "gain" && "text-gain", tone === "loss" && "text-loss")}>{value}</span>
       <span className="text-muted-foreground">{label}</span>
     </div>
   );

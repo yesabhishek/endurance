@@ -9,16 +9,16 @@ export function shellStatus(kite: KiteStatus): ShellStatus {
   const ai = aiConfig();
   const kiteLine: ShellStatus["kite"] =
     kite.state === "connected"
-      ? { tone: "ok", label: `Kite · ${kite.userId}`, detail: `Session ends ${time(kite.expiresAt)}` }
+      ? { tone: "ok", label: `Kite · ${kite.userId}`, detail: `Ends ${time(kite.expiresAt)}` }
       : kite.state === "expired"
-        ? { tone: "warn", label: `Kite · ${kite.userId}`, detail: "Log in again for live data" }
+        ? { tone: "warn", label: `Kite · ${kite.userId}`, detail: "Log in again" }
         : kite.state === "demo"
-          ? { tone: "demo", label: "Demo portfolio", detail: "Sample data, not yours" }
+          ? { tone: "demo", label: "Demo portfolio", detail: "Sample data" }
           : kite.state === "no-keys"
-            ? { tone: "off", label: "Kite keys missing", detail: "Add them to .env" }
-            : { tone: "off", label: "Kite not connected", detail: "Log in from Setup" };
+            ? { tone: "off", label: "Kite keys missing", detail: "Add to .env" }
+            : { tone: "off", label: "Kite not connected", detail: "Log in" };
   return {
     kite: kiteLine,
-    ai: ai.ok ? { ready: true, label: `${ai.label} · ${ai.model}` } : { ready: false, label: "AI key needed" },
+    ai: ai.ok ? { ready: true, provider: ai.baseUrl ? "custom" : ai.provider, name: ai.label, model: ai.model } : { ready: false, message: "AI key needed" },
   };
 }

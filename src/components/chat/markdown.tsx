@@ -1,4 +1,5 @@
 import { Fragment, type ReactNode } from "react";
+import { sensitiveText } from "@/components/privacy/sensitive";
 import { cn } from "@/lib/utils";
 
 // A small markdown renderer for model answers. It builds React elements directly
@@ -153,12 +154,13 @@ export function renderInline(text: string, cite: CiteRenderer, keyPrefix = "i"):
       const match = re.exec(rest);
       if (match && (!best || match.index < best.match.index)) best = { kind, match };
     }
+    // Plain text goes through sensitiveText so privacy mode can blur the figures in an answer.
     if (!best) {
-      out.push(rest);
+      out.push(...sensitiveText(rest, `${keyPrefix}-e${n}`));
       break;
     }
     const { kind, match } = best;
-    if (match.index > 0) out.push(rest.slice(0, match.index));
+    if (match.index > 0) out.push(...sensitiveText(rest.slice(0, match.index), `${keyPrefix}-p${n}`));
     const key = `${keyPrefix}-${n++}`;
     if (kind === "code") {
       out.push(

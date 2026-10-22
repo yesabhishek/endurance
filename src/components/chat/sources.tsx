@@ -2,7 +2,8 @@
 
 import { getToolName, isToolUIPart } from "ai";
 import { Database, X } from "lucide-react";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
+import { Sensitive, sensitiveText } from "@/components/privacy/sensitive";
 import type { ChatMessage } from "@/lib/chats";
 import { asOfLabel } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -95,6 +96,12 @@ function formatValue(key: string, value: unknown): string {
   return JSON.stringify(value);
 }
 
+/** A value as text, with any figure in it marked for privacy mode. */
+function renderValue(key: string, value: unknown): ReactNode {
+  const text = formatValue(key, value);
+  return typeof value === "number" ? <Sensitive>{text}</Sensitive> : sensitiveText(text, key);
+}
+
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
 
 function DataView({ data, depth = 0 }: { data: Record<string, unknown>; depth?: number }) {
@@ -109,7 +116,7 @@ function DataView({ data, depth = 0 }: { data: Record<string, unknown>; depth?: 
           {scalars.map(([key, value]) => (
             <div key={key} className="contents">
               <dt className="text-muted-foreground">{humanize(key)}</dt>
-              <dd className={cn("text-right tabular-nums", typeof value === "string" && value.length > 40 && "col-span-2 text-left text-muted-foreground")}>{formatValue(key, value)}</dd>
+              <dd className={cn("text-right tabular-nums", typeof value === "string" && value.length > 40 && "col-span-2 text-left text-muted-foreground")}>{renderValue(key, value)}</dd>
             </div>
           ))}
         </dl>
@@ -126,7 +133,7 @@ function DataView({ data, depth = 0 }: { data: Record<string, unknown>; depth?: 
 
 function ArrayView({ rows }: { rows: unknown[] }) {
   if (!rows.length) return <p className="text-[12.5px] text-muted-foreground">None</p>;
-  if (!rows.every(isRecord)) return <p className="text-[12.5px]">{rows.map((row) => formatValue("", row)).join(", ")}</p>;
+  if (!rows.every(isRecord)) return <p className="text-[12.5px]">{sensitiveText(rows.map((row) => formatValue("", row)).join(", "), "list")}</p>;
   const columns = Object.keys(rows[0] as Record<string, unknown>).slice(0, 8);
   return (
     <div className="-mx-1 overflow-x-auto">
@@ -145,7 +152,7 @@ function ArrayView({ rows }: { rows: unknown[] }) {
             <tr key={index} className="border-b border-border/70 last:border-0">
               {columns.map((column) => (
                 <td key={column} className={cn("px-1 py-1.5 align-top", typeof row[column] === "number" ? "text-right whitespace-nowrap tabular-nums" : "")}>
-                  {isRecord(row[column]) || Array.isArray(row[column]) ? JSON.stringify(row[column]) : formatValue(column, row[column])}
+                  {renderValue(column, row[column])}
                 </td>
               ))}
             </tr>

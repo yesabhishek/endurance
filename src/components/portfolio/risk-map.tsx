@@ -120,14 +120,14 @@ export function RiskMap({ points, limitPct }: { points: RiskPoint[]; limitPct: n
           {yTicks.map((tick) => (
             <g key={`y${tick}`}>
               <line x1={PAD.left} x2={plotRight} y1={y(tick)} y2={y(tick)} stroke={tick === 0 ? "var(--input)" : "var(--grid)"} />
-              <text x={PAD.left - 8} y={y(tick)} dy="0.32em" textAnchor="end" fontSize={11} fill="var(--muted-foreground)" className="tabular-nums">
+              <text x={PAD.left - 8} y={y(tick)} dy="0.32em" textAnchor="end" fontSize={11} fill="var(--muted-foreground)" className="sensitive tabular-nums">
                 {tick > 0 ? "+" : ""}
                 {tick}%
               </text>
             </g>
           ))}
           {xTicks.map((tick) => (
-            <text key={`x${tick}`} x={x(tick)} y={plotBottom + 16} textAnchor="middle" fontSize={11} fill="var(--muted-foreground)" className="tabular-nums">
+            <text key={`x${tick}`} x={x(tick)} y={plotBottom + 16} textAnchor="middle" fontSize={11} fill="var(--muted-foreground)" className="sensitive tabular-nums">
               {tick}%
             </text>
           ))}
@@ -174,11 +174,11 @@ export function RiskMap({ points, limitPct }: { points: RiskPoint[]; limitPct: n
             <div className="mb-1.5 text-muted-foreground">{hovered.sector}</div>
             <dl className="grid grid-cols-[auto_auto] gap-x-4 gap-y-0.5 tabular-nums">
               <dt className="text-muted-foreground">Weight</dt>
-              <dd className={cn("text-right font-semibold", hovered.weightPct > limitPct && "text-loss")}>{pct(hovered.weightPct)}</dd>
+              <dd className={cn("sensitive text-right font-semibold", hovered.weightPct > limitPct && "text-loss")}>{pct(hovered.weightPct)}</dd>
               <dt className="text-muted-foreground">Since bought</dt>
-              <dd className={cn("text-right font-semibold", hovered.returnPct >= 0 ? "text-gain" : "text-loss")}>{pct(hovered.returnPct, { signed: true })}</dd>
+              <dd className={cn("sensitive text-right font-semibold", hovered.returnPct >= 0 ? "text-gain" : "text-loss")}>{pct(hovered.returnPct, { signed: true })}</dd>
               <dt className="text-muted-foreground">P&amp;L</dt>
-              <dd className={cn("text-right font-semibold", hovered.pnl >= 0 ? "text-gain" : "text-loss")}>{inr(hovered.pnl, { signed: true })}</dd>
+              <dd className={cn("sensitive text-right font-semibold", hovered.pnl >= 0 ? "text-gain" : "text-loss")}>{inr(hovered.pnl, { signed: true })}</dd>
             </dl>
             <div className="mt-1.5 border-t pt-1.5 text-muted-foreground">Click to ask about it</div>
           </ChartTooltip>

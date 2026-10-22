@@ -5,6 +5,8 @@
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
   --color-muted: var(--muted);
   --color-muted-foreground: var(--muted-foreground);
   --color-faint: var(--faint);
@@ -51,6 +53,8 @@
   --background: #f8f7f4;
   --foreground: #171614;
   --card: #ffffff;
+  --popover: #ffffff;
+  --popover-foreground: #171614;
   --muted: #f1efea;
   --muted-foreground: #66625b;
   --faint: #99948b;
@@ -95,6 +99,8 @@
     --background: #121110;
     --foreground: #ecebe7;
     --card: #1b1a18;
+    --popover: #1b1a18;
+    --popover-foreground: #ecebe7;
     --muted: #23211f;
     --muted-foreground: #a29e96;
     --faint: #75716a;
@@ -174,6 +180,15 @@
     font-size: 0.75rem;
     font-weight: 500;
     color: var(--muted-foreground);
+  }
+  /* Privacy mode: a figure keeps its place in the layout but can't be read.
+     The radius follows the type size, so a 56px headline and 11px axis label both vanish. */
+  .sensitive {
+    transition: filter 150ms ease;
+  }
+  :root[data-privacy="hidden"] .sensitive {
+    filter: blur(0.5em);
+    user-select: none;
   }
 }
 

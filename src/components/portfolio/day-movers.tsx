@@ -26,8 +26,8 @@ export function DayMovers({ movers }: { movers: Mover[] }) {
             </span>
             <span className="flex h-6 items-center">{up ? <span className="h-3 rounded-r-[4px] bg-gain/80" style={{ width }} /> : null}</span>
             <span className="flex flex-col items-end leading-tight tabular-nums">
-              <span className={cn("text-xs font-semibold", up ? "text-gain" : "text-loss")}>{pct(row.dayPct, { signed: true, digits: 2 })}</span>
-              <span className="text-[11px] text-muted-foreground">{inr(row.dayChange, { signed: true })}</span>
+              <span className={cn("sensitive text-xs font-semibold", up ? "text-gain" : "text-loss")}>{pct(row.dayPct, { signed: true, digits: 2 })}</span>
+              <span className="sensitive text-[11px] text-muted-foreground">{inr(row.dayChange, { signed: true })}</span>
             </span>
           </li>
         );

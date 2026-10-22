@@ -2,6 +2,7 @@ import { randomBytes } from "node:crypto";
 import { AlertTriangle, ArrowRight, LogIn } from "lucide-react";
 import Link from "next/link";
 import { Chat } from "@/components/chat/chat";
+import { Sensitive } from "@/components/privacy/sensitive";
 import { aiConfig } from "@/lib/ai/provider";
 import { limits } from "@/lib/config";
 import { getHistory, getPortfolioData } from "@/lib/data";
@@ -28,9 +29,12 @@ export default async function HomePage() {
 
   const summary = analysis && snapshot ? (
     <p>
-      Your portfolio is <span className="text-foreground tabular-nums">{inr(analysis.total)}</span>,{" "}
+      Your portfolio is <span className="sensitive text-foreground tabular-nums">{inr(analysis.total)}</span>,{" "}
       <span className={cn("tabular-nums", analysis.dayChange > 0 ? "text-gain" : analysis.dayChange < 0 ? "text-loss" : "")}>
-        {analysis.dayChange >= 0 ? "up" : "down"} {inr(Math.abs(analysis.dayChange))} ({pct(Math.abs(analysis.dayChangePct), { digits: 2 })})
+        {analysis.dayChange >= 0 ? "up" : "down"}{" "}
+        <Sensitive>
+          {inr(Math.abs(analysis.dayChange))} ({pct(Math.abs(analysis.dayChangePct), { digits: 2 })})
+        </Sensitive>
       </span>{" "}
       today. {snapshot.source === "demo" ? "This is a sample portfolio." : `Kite data as of ${asOfLabel(snapshot.asOf)}.`}
     </p>

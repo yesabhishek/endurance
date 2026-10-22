@@ -5,13 +5,15 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import { CHAT_SAVED_EVENT } from "@/components/chat/ask";
+import { PrivacyToggle } from "@/components/privacy/privacy-toggle";
 import { cn } from "@/lib/utils";
+import { ProviderLogo, ZerodhaLogo, type ProviderMark } from "./provider-logo";
 
 export type ShellChat = { id: string; title: string; updatedAt: string };
 
 export type ShellStatus = {
   kite: { tone: "ok" | "warn" | "off" | "demo"; label: string; detail: string | null };
-  ai: { ready: boolean; label: string };
+  ai: { ready: true; provider: ProviderMark; name: string; model: string } | { ready: false; message: string };
 };
 
 const NAV = [
@@ -22,7 +24,7 @@ const NAV = [
 
 const short = (title: string) => (title.length > 60 ? `${title.slice(0, 58)}…` : title);
 
-function Sidebar({ chats, status, onNavigate }: { chats: ShellChat[]; status: ShellStatus; onNavigate: () => void }) {
+function Sidebar({ chats, status, privacyHidden, onNavigate }: { chats: ShellChat[]; status: ShellStatus; privacyHidden: boolean; onNavigate: () => void }) {
   const pathname = usePathname();
   const router = useRouter();
   const [list, setList] = useState(chats);
@@ -54,14 +56,17 @@ function Sidebar({ chats, status, onNavigate }: { chats: ShellChat[]; status: Sh
     if (pathname === `/c/${chat.id}`) router.push("/");
   }
 
-  const dot = { ok: "bg-gain", warn: "bg-warn", off: "bg-sidebar-muted", demo: "bg-chart-4" }[status.kite.tone];
+  // The Zerodha mark carries the Kite connection state: quiet when connected, loud when it needs you.
+  const tint = { ok: "text-sidebar-foreground", warn: "text-warn", off: "text-sidebar-muted", demo: "text-chart-4" }[status.kite.tone];
 
   return (
     <div className="flex h-full flex-col bg-sidebar text-sidebar-foreground">
-      <div className="flex items-center justify-between px-5 pt-5 pb-4">
+      <div className="flex items-center justify-between pr-3 pl-5 pt-5 pb-4">
         <Link href="/" onClick={onNavigate} className="font-display text-[1.6rem] leading-none tracking-tight">
           Endurance
         </Link>
+        {/* The mobile menu drawer has its own close button here; its top bar carries the toggle instead. */}
+        <PrivacyToggle initialHidden={privacyHidden} tone="sidebar" className="hidden md:grid" />
       </div>
 
       <div className="px-3">
@@ -131,22 +136,31 @@ function Sidebar({ chats, status, onNavigate }: { chats: ShellChat[]; status: Sh
         )}
       </div>
 
-      <Link href="/setup" onClick={onNavigate} className="mx-3 mb-3 flex flex-col gap-1.5 rounded-md border border-sidebar-border px-3 py-2.5 text-xs transition-colors hover:bg-sidebar-accent">
+      <Link href="/setup" onClick={onNavigate} className="mx-3 mb-3 flex flex-col gap-1.5 rounded-md border border-sidebar-border px-3 py-2 text-xs transition-colors hover:bg-sidebar-accent">
         <span className="flex items-center gap-2">
-          <span aria-hidden className={cn("size-1.5 shrink-0 rounded-full", dot)} />
-          <span className="font-medium">{status.kite.label}</span>
+          <ZerodhaLogo className={cn("size-3.5 shrink-0", tint)} />
+          <span className="shrink-0 font-medium">{status.kite.label}</span>
+          {status.kite.detail ? <span className="truncate text-sidebar-muted">{status.kite.detail}</span> : null}
         </span>
-        {status.kite.detail ? <span className="pl-3.5 text-sidebar-muted">{status.kite.detail}</span> : null}
-        <span className="flex items-center gap-2">
-          <span aria-hidden className={cn("size-1.5 shrink-0 rounded-full", status.ai.ready ? "bg-gain" : "bg-warn")} />
-          <span className="truncate text-sidebar-muted">{status.ai.label}</span>
-        </span>
+        {status.ai.ready ? (
+          <span className="flex items-center gap-2" title={`${status.ai.name} · ${status.ai.model}`}>
+            <ProviderLogo provider={status.ai.provider} name={status.ai.name} className="size-3.5 shrink-0 text-sidebar-foreground" />
+            <span className="truncate text-sidebar-muted">{status.ai.model}</span>
+          </span>
+        ) : (
+          <span className="flex items-center gap-2">
+            <span aria-hidden className="grid size-3.5 shrink-0 place-items-center">
+              <span className="size-1.5 rounded-full bg-warn" />
+            </span>
+            <span className="truncate text-sidebar-muted">{status.ai.message}</span>
+          </span>
+        )}
       </Link>
     </div>
   );
 }
 
-export function AppShell({ chats, status, children }: { chats: ShellChat[]; status: ShellStatus; children: ReactNode }) {
+export function AppShell({ chats, status, privacyHidden, children }: { chats: ShellChat[]; status: ShellStatus; privacyHidden: boolean; children: ReactNode }) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
   const [lastPath, setLastPath] = useState(pathname);
@@ -159,13 +173,13 @@ export function AppShell({ chats, status, children }: { chats: ShellChat[]; stat
   return (
     <div className="flex h-dvh overflow-hidden">
       <aside className="hidden w-64 shrink-0 md:block">
-        <Sidebar chats={chats} status={status} onNavigate={() => undefined} />
+        <Sidebar chats={chats} status={status} privacyHidden={privacyHidden} onNavigate={() => undefined} />
       </aside>
 
       {open ? (
         <div className="fixed inset-0 z-50 flex bg-black/40 md:hidden" onClick={() => setOpen(false)}>
           <div className="relative h-full w-72 max-w-[85vw]" onClick={(event) => event.stopPropagation()}>
-            <Sidebar chats={chats} status={status} onNavigate={() => setOpen(false)} />
+            <Sidebar chats={chats} status={status} privacyHidden={privacyHidden} onNavigate={() => setOpen(false)} />
             <button type="button" onClick={() => setOpen(false)} aria-label="Close menu" className="absolute top-4 right-3 grid size-8 place-items-center rounded-md text-sidebar-muted hover:text-sidebar-foreground">
               <X className="size-4" aria-hidden />
             </button>
@@ -181,6 +195,7 @@ export function AppShell({ chats, status, children }: { chats: ShellChat[]; stat
           <Link href="/" className="font-display text-xl">
             Endurance
           </Link>
+          <PrivacyToggle initialHidden={privacyHidden} tone="page" className="ml-auto" />
         </header>
         <main className="min-h-0 flex-1 overflow-y-auto">{children}</main>
       </div>

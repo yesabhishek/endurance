@@ -1,4 +1,5 @@
 import { AlertTriangle, CheckCircle2, OctagonAlert } from "lucide-react";
+import { sensitiveText } from "@/components/privacy/sensitive";
 import { AskButton } from "./ask-button";
 import type { RiskCheck, RiskReport, Zone } from "@/lib/risk";
 import { cn } from "@/lib/utils";
@@ -71,7 +72,7 @@ function RiskMeter({ check }: { check: RiskCheck }) {
       <div className="flex items-baseline justify-between gap-3">
         <span className="text-[0.8125rem] font-medium">{check.label}</span>
         <span className="flex items-center gap-2">
-          <span className="text-sm font-semibold tabular-nums">{display(check)}</span>
+          <span className="sensitive text-sm font-semibold tabular-nums">{display(check)}</span>
           <span className={cn("inline-flex items-center gap-1 text-xs font-medium", meta.text)}>
             <Icon className="size-3.5" aria-hidden />
             {meta.label}
@@ -91,7 +92,7 @@ function RiskMeter({ check }: { check: RiskCheck }) {
         />
       </div>
       <div className="flex items-start justify-between gap-3">
-        <p className="text-xs text-muted-foreground">{check.detail}</p>
+        <p className="text-xs text-muted-foreground">{sensitiveText(check.detail, check.id)}</p>
         {check.zone !== "good" ? <AskButton question={check.question} label="Why?" className="-mt-1 -mr-2" /> : null}
       </div>
     </li>

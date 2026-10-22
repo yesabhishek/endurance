@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { ChartTooltip } from "@/components/charts/chart-tooltip";
 import { useElementWidth } from "@/components/charts/use-element-width";
 import { useAsk } from "@/components/chat/ask";
+import { Sensitive } from "@/components/privacy/sensitive";
 import { Segmented } from "./panel";
 import { squarify } from "@/lib/charts/treemap";
 import { inr, inrShort, pct } from "@/lib/format";
@@ -16,7 +17,8 @@ export type HeatTile = {
   group: string;
   value: number;
   weightPct: number;
-  dayPct: number;
+  /** Null when Kite reports no daily move for the holding (mutual funds), as opposed to a real 0%. */
+  dayPct: number | null;
   returnPct: number | null;
 };
 
@@ -28,22 +30,30 @@ const STEPS = [0.25, 0.5, 0.75, 1];
 const GAP = 2;
 const HEADER = 18;
 
-function heatStep(value: number, metric: Metric) {
+function heatStep(value: number | null, metric: Metric) {
+  if (value === null) return 0;
   const t = Math.min(1, Math.abs(value) / DOMAIN[metric]);
   // Near-zero moves stay neutral grey; everything else snaps to one of four steps per side.
   if (t < 0.06) return 0;
   return STEPS.find((step) => t <= step) ?? 1;
 }
 
-function heatColor(value: number, metric: Metric) {
+function heatColor(value: number | null, metric: Metric) {
   const step = heatStep(value, metric);
-  if (!step) return "var(--heat-mid)";
+  if (!step || value === null) return "var(--heat-mid)";
   const pole = value > 0 ? "var(--heat-up)" : "var(--heat-down)";
   return `color-mix(in oklab, ${pole} ${Math.round(18 + step * 82)}%, var(--heat-mid))`;
 }
 
+/** The move a tile is coloured by, or null when it isn't reported. */
 function metricValue(tile: HeatTile, metric: Metric) {
-  return metric === "day" ? tile.dayPct : (tile.returnPct ?? 0);
+  return metric === "day" ? tile.dayPct : tile.returnPct;
+}
+
+/** Green for a gain, red for a loss, and no colour for a flat or unknown move. */
+function moveTone(value: number | null) {
+  if (value === null || value === 0) return "text-muted-foreground";
+  return value > 0 ? "text-gain" : "text-loss";
 }
 
 /**
@@ -98,7 +108,7 @@ export function HoldingsHeatmap({ tiles }: { tiles: HeatTile[] }) {
                   style={{ left: group.x, top: group.y, width: group.w, height: HEADER }}
                 >
                   <span className="truncate font-medium text-foreground">{group.item.label}</span>
-                  <span className="tabular-nums">{pct((group.item.value / total) * 100)}</span>
+                  <span className="sensitive tabular-nums">{pct((group.item.value / total) * 100)}</span>
                 </div>
               ) : null}
               {group.cells.map((cell) => {
@@ -118,7 +128,7 @@ export function HoldingsHeatmap({ tiles }: { tiles: HeatTile[] }) {
                     onFocus={() => setActive(tile.id)}
                     onBlur={() => setActive(null)}
                     onClick={() => ask(`Tell me about my ${tile.label} holding: its weight, P&L, and what it does to my ${tile.group} exposure.`)}
-                    aria-label={`${tile.name}, ${pct(tile.weightPct)} of portfolio, ${pct(tile.dayPct, { signed: true, digits: 2 })} today, ${tile.returnPct === null ? "return unknown" : `${pct(tile.returnPct, { signed: true })} since bought`}. Ask about it.`}
+                    aria-label={`${tile.name}, ${pct(tile.weightPct)} of portfolio, ${tile.dayPct === null ? "no daily move reported" : `${pct(tile.dayPct, { signed: true, digits: 2 })} today`}, ${tile.returnPct === null ? "return unknown" : `${pct(tile.returnPct, { signed: true })} since bought`}. Ask about it.`}
                     className={cn(
                       "absolute flex flex-col items-start justify-between overflow-hidden rounded-[3px] p-1.5 text-left transition-[filter] focus-visible:z-10 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring",
                       // Measured contrast: white only on the darkest light-mode step, near-black on strong dark-mode steps.
@@ -130,8 +140,8 @@ export function HoldingsHeatmap({ tiles }: { tiles: HeatTile[] }) {
                   >
                     {showLabel ? <span className={cn("max-w-full truncate leading-tight font-semibold", big ? "text-sm" : "text-[11px]")}>{tile.label}</span> : null}
                     {showValue ? (
-                      <span className={cn("leading-tight tabular-nums", big ? "text-[13px]" : "text-[11px]", step === 1 ? "text-white/90" : "text-foreground/70", step >= 0.75 && "dark:text-[#0b0d10]/75")}>
-                        {tile.returnPct === null && metric === "return" ? "—" : pct(value, { signed: true, digits: metric === "day" ? 2 : 1 })}
+                      <span className={cn("sensitive leading-tight tabular-nums", big ? "text-[13px]" : "text-[11px]", step === 1 ? "text-white/90" : "text-foreground/70", step >= 0.75 && "dark:text-[#0b0d10]/75")}>
+                        {value === null ? "—" : pct(value, { signed: true, digits: metric === "day" ? 2 : 1 })}
                       </span>
                     ) : null}
                   </button>
@@ -147,13 +157,15 @@ export function HoldingsHeatmap({ tiles }: { tiles: HeatTile[] }) {
             <div className="mb-1.5 text-muted-foreground">{activeTile.group}</div>
             <dl className="grid grid-cols-[auto_auto] gap-x-4 gap-y-0.5 tabular-nums">
               <dt className="text-muted-foreground">Current value</dt>
-              <dd className="text-right font-semibold">{inr(activeTile.value)}</dd>
+              <dd className="sensitive text-right font-semibold">{inr(activeTile.value)}</dd>
               <dt className="text-muted-foreground">Weight</dt>
-              <dd className="text-right font-semibold">{pct(activeTile.weightPct)}</dd>
+              <dd className="sensitive text-right font-semibold">{pct(activeTile.weightPct)}</dd>
               <dt className="text-muted-foreground">Today</dt>
-              <dd className={cn("text-right font-semibold", activeTile.dayPct >= 0 ? "text-gain" : "text-loss")}>{pct(activeTile.dayPct, { signed: true, digits: 2 })}</dd>
+              <dd className={cn("sensitive text-right font-semibold", moveTone(activeTile.dayPct))}>
+                {activeTile.dayPct === null ? "Not reported" : pct(activeTile.dayPct, { signed: true, digits: 2 })}
+              </dd>
               <dt className="text-muted-foreground">Since bought</dt>
-              <dd className={cn("text-right font-semibold", (activeTile.returnPct ?? 0) >= 0 ? "text-gain" : "text-loss")}>
+              <dd className={cn("sensitive text-right font-semibold", moveTone(activeTile.returnPct))}>
                 {activeTile.returnPct === null ? "—" : pct(activeTile.returnPct, { signed: true })}
               </dd>
             </dl>
@@ -162,7 +174,8 @@ export function HoldingsHeatmap({ tiles }: { tiles: HeatTile[] }) {
         ) : null}
       </div>
       <p className="text-xs text-muted-foreground">
-        Area is the share of your {inrShort(total)}. Colour is the move{metric === "day" ? " today, full at ±3%" : " since you bought, full at ±50%"}.
+        Area is the share of your <Sensitive>{inrShort(total)}</Sensitive>. Colour is the move{metric === "day" ? " today, full at ±3%" : " since you bought, full at ±50%"}.
+        {metric === "day" && tiles.some((tile) => tile.dayPct === null) ? " Funds report no daily move, so they stay grey." : ""}
       </p>
     </div>
   );

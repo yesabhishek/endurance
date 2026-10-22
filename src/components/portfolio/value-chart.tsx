@@ -3,6 +3,7 @@
 import { useMemo, useState, type PointerEvent } from "react";
 import { ChartTooltip, TooltipRow } from "@/components/charts/chart-tooltip";
 import { useElementWidth } from "@/components/charts/use-element-width";
+import { Sensitive } from "@/components/privacy/sensitive";
 import { Segmented } from "./panel";
 import { linear, niceTicks } from "@/lib/charts/scale";
 import { inr, inrCompact, pct } from "@/lib/format";
@@ -81,7 +82,10 @@ export function ValueChart({ points }: { points: Point[] }) {
             <span aria-hidden className="w-3 border-t-[1.5px] border-dashed border-faint" /> Investment
           </span>
           <span className={cn("font-medium tabular-nums", gain >= 0 ? "text-gain" : "text-loss")}>
-            {inr(gain, { signed: true })} ({pct(gainPct, { signed: true })}) market gain over {range === "ALL" ? "the period" : range}
+            <Sensitive>
+              {inr(gain, { signed: true })} ({pct(gainPct, { signed: true })})
+            </Sensitive>{" "}
+            market gain over {range === "ALL" ? "the period" : range}
           </span>
         </div>
         <Segmented label="Range" value={range} onChange={setRange} options={ranges.map((value) => ({ value, label: value === "ALL" ? "All" : value }))} />
@@ -100,7 +104,7 @@ export function ValueChart({ points }: { points: Point[] }) {
           {ticks.map((tick) => (
             <g key={tick}>
               <line x1={PAD.left} x2={width - PAD.right} y1={y(tick)} y2={y(tick)} stroke="var(--grid)" />
-              <text x={PAD.left - 8} y={y(tick)} dy="0.32em" textAnchor="end" fontSize={11} fill="var(--muted-foreground)" className="tabular-nums">
+              <text x={PAD.left - 8} y={y(tick)} dy="0.32em" textAnchor="end" fontSize={11} fill="var(--muted-foreground)" className="sensitive tabular-nums">
                 {inrCompact(tick)}
               </text>
             </g>

@@ -32,6 +32,15 @@ describe("answer markdown", () => {
     expect(out.match(/<ul/g)).toHaveLength(2);
   });
 
+  it("marks figures for privacy mode, in text and in tables, but never a citation", () => {
+    const out = html("Value is ₹4.2 lakh [S2], up 3%.\n\n| Stock | Value |\n|---|---:|\n| INFY | ₹1,42,200 |");
+    expect(out).toContain('<span class="sensitive">₹4.2 lakh</span>');
+    expect(out).toContain('<span class="sensitive">3%</span>');
+    expect(out).toContain('<span class="sensitive">₹1,42,200</span>');
+    expect(out).toContain("<sup>S2</sup>");
+    expect(out).not.toContain('sensitive">S2');
+  });
+
   it("does not italicise snake_case words", () => {
     expect(html("value_history and list_holdings")).not.toContain("<em>");
   });

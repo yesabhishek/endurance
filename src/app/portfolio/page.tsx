@@ -6,6 +6,7 @@ import { AssetClassBar } from "@/components/portfolio/allocation";
 import { DayMovers } from "@/components/portfolio/day-movers";
 import { HoldingsHeatmap } from "@/components/portfolio/holdings-heatmap";
 import { HoldingsTable } from "@/components/portfolio/holdings-table";
+import { Sensitive } from "@/components/privacy/sensitive";
 import { Panel } from "@/components/portfolio/panel";
 import { RefreshButton } from "@/components/portfolio/refresh-button";
 import { RiskMap } from "@/components/portfolio/risk-map";
@@ -51,7 +52,7 @@ export default async function PortfolioPage() {
   const risk = assessRisk(p);
   const demo = snapshot.source === "demo";
 
-  const tiles = p.holdings.map((h) => ({ id: h.key, label: shortName(h), name: h.name, group: h.sector, value: h.value, weightPct: h.weightPct, dayPct: h.dayPct, returnPct: h.pnlPct }));
+  const tiles = p.holdings.map((h) => ({ id: h.key, label: shortName(h), name: h.name, group: h.sector, value: h.value, weightPct: h.weightPct, dayPct: h.assetClass === "MUTUAL_FUND" ? null : h.dayPct, returnPct: h.pnlPct }));
   const riskPoints = p.holdings
     .filter((h) => h.assetClass === "STOCK" && h.pnlPct !== null)
     .map((h) => ({ id: h.key, symbol: h.symbol, sector: h.sector, weightPct: h.weightPct, returnPct: h.pnlPct ?? 0, value: h.value, pnl: h.pnl }));
@@ -99,22 +100,25 @@ export default async function PortfolioPage() {
       <section aria-label="Summary" className="grid grid-cols-1 overflow-hidden rounded-lg border bg-card lg:grid-cols-[minmax(0,1.1fr)_minmax(0,2fr)]">
         <div className="flex flex-col justify-between gap-2 border-b p-6 lg:border-r lg:border-b-0">
           <span className="eyebrow">Current value</span>
-          <span className="numeral text-5xl leading-none md:text-[3.5rem]">{inr(p.total)}</span>
+          <span className="sensitive numeral text-5xl leading-none md:text-[3.5rem]">{inr(p.total)}</span>
           <span className={cn("text-sm tabular-nums", p.dayChange >= 0 ? "text-gain" : "text-loss")}>
-            {inr(p.dayChange, { signed: true })} ({pct(p.dayChangePct, { signed: true, digits: 2 })}) <span className="text-muted-foreground">today</span>
+            <Sensitive>
+              {inr(p.dayChange, { signed: true })} ({pct(p.dayChangePct, { signed: true, digits: 2 })})
+            </Sensitive>{" "}
+            <span className="text-muted-foreground">today</span>
           </span>
         </div>
         <dl className="grid grid-cols-2 sm:grid-cols-4">
           {[
-            { label: "Invested", value: inrShort(p.invested) },
-            { label: "Total P&L", value: inr(p.totalPnl, { signed: true }), sub: pct(p.totalPnlPct, { signed: true, digits: 2 }), tone: p.totalPnl >= 0 ? "gain" : "loss" },
+            { label: "Invested", value: inrShort(p.invested), figure: true },
+            { label: "Total P&L", value: inr(p.totalPnl, { signed: true }), sub: pct(p.totalPnlPct, { signed: true, digits: 2 }), tone: p.totalPnl >= 0 ? "gain" : "loss", figure: true, subFigure: true },
             { label: "Holdings", value: String(p.holdings.length), sub: `${p.sectors.filter((slice) => slice.label !== "Unclassified").length} sectors` },
-            { label: "Available funds", value: snapshot.availableFunds === null ? "—" : inrShort(snapshot.availableFunds), sub: "Kite equity margin" },
+            { label: "Available funds", value: snapshot.availableFunds === null ? "—" : inrShort(snapshot.availableFunds), sub: "Kite equity margin", figure: true },
           ].map((item, index) => (
             <div key={item.label} className={cn("flex flex-col gap-1.5 p-6", index % 2 === 0 && "border-r", index < 2 && "border-b sm:border-b-0", index === 1 && "sm:border-r", index === 2 && "sm:border-r")}>
               <dt className="eyebrow">{item.label}</dt>
-              <dd className={cn("numeral text-2xl leading-tight", item.tone === "gain" && "text-gain", item.tone === "loss" && "text-loss")}>{item.value}</dd>
-              {item.sub ? <dd className="text-xs text-muted-foreground tabular-nums">{item.sub}</dd> : null}
+              <dd className={cn("numeral text-2xl leading-tight", item.figure && "sensitive", item.tone === "gain" && "text-gain", item.tone === "loss" && "text-loss")}>{item.value}</dd>
+              {item.sub ? <dd className={cn("text-xs text-muted-foreground tabular-nums", item.subFigure && "sensitive")}>{item.sub}</dd> : null}
             </div>
           ))}
         </dl>
@@ -164,10 +168,10 @@ export default async function PortfolioPage() {
                   <span className="flex flex-col">
                     <span className="font-medium">{position.symbol}</span>
                     <span className="text-xs text-muted-foreground">
-                      {position.product} · {position.quantity} qty
+                      {position.product} · <Sensitive>{position.quantity}</Sensitive> qty
                     </span>
                   </span>
-                  <span className={cn("tabular-nums", position.pnl >= 0 ? "text-gain" : "text-loss")}>{inr(position.pnl, { signed: true })}</span>
+                  <span className={cn("sensitive tabular-nums", position.pnl >= 0 ? "text-gain" : "text-loss")}>{inr(position.pnl, { signed: true })}</span>
                 </li>
               ))}
             </ul>
