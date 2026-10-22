@@ -37,8 +37,6 @@
     "**/*.mts"
   ],
   "exclude": [
-    "node_modules",
-    "web",
-    "kite-mcp"
+    "node_modules"
   ]
 }
