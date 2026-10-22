@@ -1,112 +1,27 @@
-# Endurance: self-hosted portfolio dashboard for Zerodha Kite.
+# Endurance in Docker, if you'd rather not install Node.
 #
-#   ./scripts/setup.sh        # once: writes .env with random secrets
-#   docker compose up         # then open http://localhost:3000
+#   cp .env.example .env     # add your Kite app keys and one AI key
+#   docker compose up        # builds once, then open http://localhost:3000
 #
-# `up` pulls the released images from ghcr.io (set ENDURANCE_VERSION in .env to
-# pin one, default latest). `docker compose up --build` builds this checkout instead.
-#
-# Only the web app is published, and only on 127.0.0.1. Postgres and Redis are
-# reachable from inside this compose network only. To use Endurance from other
-# devices, put it behind HTTPS and set APP_URL (see README, "Running on a server").
-
-x-app-env: &app-env
-  NODE_ENV: production
-  DATABASE_URL: postgresql://endurance:${POSTGRES_PASSWORD:?Run ./scripts/setup.sh first}@postgres:5432/endurance
-  REDIS_URL: redis://:${REDIS_PASSWORD:?Run ./scripts/setup.sh first}@redis:6379
-  APP_SECRET: ${APP_SECRET:?Run ./scripts/setup.sh first}
-  APP_SECRET_PREVIOUS: ${APP_SECRET_PREVIOUS:-}
-  APP_URL: ${APP_URL:-http://localhost:3000}
-  ALLOWED_HOSTS: ${ALLOWED_HOSTS:-}
-  ALLOW_SIGNUP: ${ALLOW_SIGNUP:-false}
-  TRUST_PROXY: ${TRUST_PROXY:-false}
-  GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
-  GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
-  GMAIL_SYNC_MONTHS: ${GMAIL_SYNC_MONTHS:-48}
-  GMAIL_SYNC_LIMIT: ${GMAIL_SYNC_LIMIT:-500}
-
-x-hardening: &hardening
-  restart: unless-stopped
-  security_opt:
-    - no-new-privileges:true
-  cap_drop:
-    - ALL
+# The app is published on 127.0.0.1 only, so other devices on your network can't
+# reach it. Your Kite session, snapshots and chats live in the endurance-data volume.
 
 services:
-  postgres:
-    image: postgres:16-alpine
-    <<: *hardening
-    # The official image drops to the postgres user at start, which needs default capabilities.
-    cap_drop: []
+  endurance:
+    build: .
+    image: endurance:local
+    env_file: .env
     environment:
-      POSTGRES_USER: endurance
-      POSTGRES_DB: endurance
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Run ./scripts/setup.sh first}
-    volumes:
-      - postgres-data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U endurance -d endurance"]
-      interval: 5s
-      timeout: 5s
-      retries: 20
-
-  redis:
-    image: redis:7-alpine
-    <<: *hardening
-    # The official image drops to the redis user at start, which needs default capabilities.
-    cap_drop: []
-    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD:?Run ./scripts/setup.sh first}", "--appendonly", "yes"]
-    volumes:
-      - redis-data:/data
-    healthcheck:
-      test: ["CMD-SHELL", "redis-cli -a \"$$REDIS_PASSWORD\" --no-auth-warning ping | grep PONG"]
-      interval: 5s
-      timeout: 5s
-      retries: 20
-    environment:
-      REDIS_PASSWORD: ${REDIS_PASSWORD}
-
-  migrate:
-    image: ghcr.io/yesabhishek/endurance-migrate:${ENDURANCE_VERSION:-latest}
-    build:
-      context: ./web
-      target: migrate
-    environment: *app-env
-    depends_on:
-      postgres:
-        condition: service_healthy
-    restart: "no"
-
-  web:
-    image: ghcr.io/yesabhishek/endurance-web:${ENDURANCE_VERSION:-latest}
-    build:
-      context: ./web
-      target: runner
-    <<: *hardening
-    environment: *app-env
+      DATA_DIR: /data
     ports:
       - "127.0.0.1:${PORT:-3000}:3000"
-    depends_on:
-      migrate:
-        condition: service_completed_successfully
-      redis:
-        condition: service_healthy
-
-  worker:
-    image: ghcr.io/yesabhishek/endurance-worker:${ENDURANCE_VERSION:-latest}
-    build:
-      context: ./web
-      target: worker
-    <<: *hardening
-    environment:
-      <<: *app-env
-      SYNC_WORKER_CONCURRENCY: ${SYNC_WORKER_CONCURRENCY:-2}
-    depends_on:
-      migrate:
-        condition: service_completed_successfully
-      redis:
-        condition: service_healthy
+    volumes:
+      - endurance-data:/data
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
 
 volumes:
-  postgres-data:
-  redis-data:
+  endurance-data:

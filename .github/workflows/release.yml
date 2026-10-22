@@ -1,9 +1,8 @@
-name: Release images
+name: Release image
 
-# Publishing a GitHub release builds the three images docker-compose.yml uses and
-# pushes them to GitHub Container Registry, for Intel/AMD and ARM (Apple Silicon,
-# Raspberry Pi) machines. Tags: the release version (0.1.0), major.minor (0.1)
-# and, for non-prereleases, latest.
+# Publishing a GitHub release builds the Endurance image and pushes it to GitHub
+# Container Registry, for Intel/AMD and ARM (Apple Silicon, Raspberry Pi) machines.
+# Tags: the release version (0.2.0), major.minor (0.2) and, for non-prereleases, latest.
 
 on:
   release:
@@ -17,25 +16,15 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  images:
-    name: ${{ matrix.image }}
+  image:
+    name: endurance
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - image: endurance-web
-            target: runner
-            description: Endurance web app (Next.js standalone server)
-          - image: endurance-worker
-            target: worker
-            description: Endurance background sync worker
-          - image: endurance-migrate
-            target: migrate
-            description: Endurance database migrations (Prisma migrate deploy)
+    env:
+      IMAGE: endurance
+      DESCRIPTION: Ask questions about your Zerodha portfolio. Self-hosted, read-only, bring your own keys.
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -61,22 +50,22 @@ jobs:
           # links the package to this repository and shows its description.
           DOCKER_METADATA_ANNOTATIONS_LEVELS: manifest,index
         with:
-          images: ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}
+          images: ghcr.io/${{ github.repository_owner }}/${{ env.IMAGE }}
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
           labels: |
-            org.opencontainers.image.title=${{ matrix.image }}
-            org.opencontainers.image.description=${{ matrix.description }}
+            org.opencontainers.image.title=${{ env.IMAGE }}
+            org.opencontainers.image.description=${{ env.DESCRIPTION }}
           annotations: |
-            org.opencontainers.image.title=${{ matrix.image }}
-            org.opencontainers.image.description=${{ matrix.description }}
+            org.opencontainers.image.title=${{ env.IMAGE }}
+            org.opencontainers.image.description=${{ env.DESCRIPTION }}
 
       - name: Build and push
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
-          context: web
-          target: ${{ matrix.target }}
+          context: .
+          target: runner
           platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
@@ -84,5 +73,5 @@ jobs:
           annotations: ${{ steps.meta.outputs.annotations }}
           provenance: mode=max
           sbom: true
-          cache-from: type=gha,scope=${{ matrix.target }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.target }}
+          cache-from: type=gha,scope=runner
+          cache-to: type=gha,mode=max,scope=runner

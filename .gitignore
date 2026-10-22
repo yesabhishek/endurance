@@ -1,4 +1,4 @@
-# Secrets: never commit real credentials. Only *.example templates are tracked.
+# Secrets: never commit real credentials. Only .env.example is tracked.
 .env
 .env.*
 !.env.example
@@ -6,21 +6,9 @@
 !*.env.example
 *.pem
 *.key
-*.p12
-secrets/
 
-# Local data: databases, dumps, uploads
-*.db
-*.db-journal
-*.db-wal
-*.db-shm
-*.sqlite
-*.sqlite3
-*.dump
-*.sql.gz
-pgdata/
-/data/
-web/data/
+# Local data: today's Kite session, snapshots and chats
+.data/
 
 # Dependencies and build output
 node_modules/
@@ -32,30 +20,16 @@ coverage/
 *.tsbuildinfo
 next-env.d.ts
 
-# Go build output from the legacy kite-mcp folder
-kite-mcp/kite-mcp-server
-
-# Kite session data
-*.session
-access_token*
-
 # Logs
 *.log
 npm-debug.log*
 
-# Python leftovers from the old Django app
-__pycache__/
-*.py[cod]
-venv/
-.venv/
-
-# OS and editor files
+# OS, editor and tool files
 .DS_Store
 Thumbs.db
 .idea/
 .vscode/
 *.swp
 *~
-
-# Tool state
 .gstack/
+.claude/
