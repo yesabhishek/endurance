@@ -4,9 +4,7 @@
 import { execFileSync } from "node:child_process";
 
 const REVIEWED_EXCEPTIONS = {
-  // deepmerge-ts stack exhaustion on recursive object graphs. Only the Prisma CLI's
-  // config loader uses it, on our own config at migrate time. Fixed in Prisma 7.
-  "GHSA-ggr8-5vv4-36mx": "prisma CLI only; upgrade to Prisma 7 to remove",
+  // None at the moment. Add "GHSA-...": "why it is not reachable" when one is needed.
 };
 
 const BLOCKING = new Set(["high", "critical"]);

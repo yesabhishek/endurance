@@ -1,4 +1,4 @@
-import { convertToModelMessages, createIdGenerator, isToolUIPart, stepCountIs, streamText, validateUIMessages, type ModelMessage } from "ai";
+import { convertToModelMessages, createIdGenerator, createUIMessageStreamResponse, isStepCount, isToolUIPart, streamText, toUIMessageStream, validateUIMessages, type ModelMessage } from "ai";
 import { z } from "zod";
 import { aiConfig, languageModel } from "@/lib/ai/provider";
 import { systemPrompt } from "@/lib/ai/prompt";
@@ -79,23 +79,27 @@ export async function POST(request: Request) {
 
   const result = streamText({
     model: languageModel(ai),
-    system: systemPrompt(limits(), { demo: isDemo() }),
+    instructions: systemPrompt(limits(), { demo: isDemo() }),
     messages: modelMessages,
     tools,
-    // Look at the data before saying anything.
-    prepareStep: ({ stepNumber }) => (stepNumber === 0 ? { toolChoice: "required" } : undefined),
-    stopWhen: stepCountIs(8),
+    // Look at the data before saying anything, then answer freely. Both choices are explicit
+    // because AI SDK 7 carries some prepareStep overrides forward into later steps.
+    prepareStep: ({ stepNumber }) => ({ toolChoice: stepNumber === 0 ? "required" : "auto" }),
+    stopWhen: isStepCount(8),
     onError: ({ error }) => console.error("[chat] model error:", error instanceof Error ? error.message : error),
   });
 
-  return result.toUIMessageStreamResponse<ChatMessage>({
+  const stream = toUIMessageStream<typeof tools, ChatMessage>({
+    stream: result.stream,
+    tools,
     originalMessages: messages,
     generateMessageId: createIdGenerator({ prefix: "msg", size: 16 }),
     messageMetadata: ({ part }) => (part.type === "start" ? { model: `${ai.label} · ${ai.model}`, createdAt: new Date().toISOString() } : undefined),
-    onFinish: async ({ messages: finished }) => {
+    onEnd: async ({ messages: finished }) => {
       await saveChat(id, finished).catch((error) => console.error("[chat] could not save", error));
     },
     onError: (error) => friendlyError(error, ai.model),
-    headers: { "Cache-Control": "no-store" },
   });
+
+  return createUIMessageStreamResponse({ stream, headers: { "Cache-Control": "no-store" } });
 }
