@@ -20,6 +20,10 @@ updates:
       # don't support ESLint 10 yet (react crashes on it). Revisit when they do.
       - dependency-name: "eslint"
         update-types: ["version-update:semver-major"]
+      # typescript-eslint (inside eslint-config-next) refuses to run on TypeScript 7.
+      # Revisit when it supports it: https://github.com/typescript-eslint/typescript-eslint/issues/10940
+      - dependency-name: "typescript"
+        versions: [">=7"]
 
   - package-ecosystem: github-actions
     directory: /
