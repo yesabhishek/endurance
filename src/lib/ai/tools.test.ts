@@ -4,7 +4,7 @@ import type { PortfolioData } from "@/lib/data";
 import { buildTools } from "./tools";
 
 const limits = { singleStockLimitPct: 10, sectorLimitPct: 25 };
-const options = { toolCallId: "t", messages: [] };
+const options = { toolCallId: "t", messages: [], context: {} };
 
 /** Tool results can be streamed in general; ours never are. */
 async function run<T>(value: T | PromiseLike<T> | AsyncIterable<T>): Promise<T> {

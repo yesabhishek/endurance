@@ -1,5 +1,7 @@
+// Must stay the first import: it clears empty *_BASE_URL variables before the SDKs load.
+import "./clean-env";
 import { createAnthropic } from "@ai-sdk/anthropic";
-import { createGoogleGenerativeAI } from "@ai-sdk/google";
+import { createGoogle } from "@ai-sdk/google";
 import { createOpenAI } from "@ai-sdk/openai";
 import { createGateway, type LanguageModel } from "ai";
 import { env } from "@/lib/config";
@@ -73,7 +75,7 @@ export function languageModel(config: Extract<AiConfig, { ok: true }>): Language
     case "anthropic":
       return createAnthropic({ apiKey: config.apiKey })(config.model);
     case "google":
-      return createGoogleGenerativeAI({ apiKey: config.apiKey })(config.model);
+      return createGoogle({ apiKey: config.apiKey })(config.model);
     case "gateway":
       return createGateway({ apiKey: config.apiKey })(config.model);
   }

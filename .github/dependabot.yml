@@ -8,6 +8,18 @@ updates:
     groups:
       minor-and-patch:
         update-types: ["minor", "patch"]
+      # The AI SDK packages share one provider spec, so their majors must move together.
+      ai-sdk:
+        patterns: ["ai", "@ai-sdk/*"]
+        update-types: ["major"]
+    ignore:
+      # Types follow the Node version we run (22, see engines and the Dockerfile).
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
+      # eslint-config-next bundles eslint-plugin-react, -import and -jsx-a11y, which
+      # don't support ESLint 10 yet (react crashes on it). Revisit when they do.
+      - dependency-name: "eslint"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: github-actions
     directory: /
